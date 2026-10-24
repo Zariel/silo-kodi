@@ -163,3 +163,9 @@ Launch Silo from Kodi's video add-ons or through JSON-RPC `Addons.ExecuteAddon` 
 Open **Account**, choose profiles, and select a PIN-protected test profile. Incorrect input must leave the original profile active. Correct input must open that profile's Home after closing Account, without retaining the original profile's Continue Watching rows. Switch back and verify the original rows return. Use Kodi's masked text entry: its numeric input ignores the hidden-input option, and Silo accepts nonnumeric PINs. Canceling the dialog must not submit a PIN attempt.
 
 The device check passes incorrect/correct PIN entry and switching in both directions with an empty-history temporary profile. The temporary profile is removed and the original selection restored after acceptance. This does not qualify every content restriction or profile-token expiry scenario.
+
+## Verified Home refresh and ZIP upgrade
+
+An empty-history test profile played an episode, sought beyond two minutes, and stopped. The existing Home window then showed that episode in Continue Watching. An independent Silo watch read confirmed the saved position, and a section read confirmed the same content ID. The browser window ID remained unchanged across playback. The test restored the original profile and removed its temporary profile afterward.
+
+The ZIP upgrade check builds twice and compares the bytes, deploys the archive, then independently hashes every installed package file against its ZIP member. It compares the saved session file before and after deployment, checks its `0600` permissions, and makes an authenticated account request afterward. These checks pass for the development upgrade path. They do not establish installation through Kodi's ZIP installer or execution of the GitHub Release workflow.
