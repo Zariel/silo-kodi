@@ -103,7 +103,7 @@ python scripts/dev.py browse
 
 ## Qualify real Silo playback
 
-This is the acceptance procedure for the complete client, not a claim that the development build passes every step. The initial original-stream test establishes decoding and progress persistence only. Slow seeking was observed and remains unresolved. Mid-playback media credential refresh, resume acceptance, episode playback, output qualification, and failure/replacement checks remain open.
+This is the acceptance procedure for the complete client, not a claim that the development build passes every step. Representative SDR movies and episodes play, and the UI resume and start-over choices reach their expected positions. Seeking recovery varies. Mid-playback media credential refresh, output qualification, and failure/replacement checks remain open. See the [compatibility status](playback-references.md) for measured results and limits.
 
 1. Approve device sign-in in your existing Silo browser session. Use two account profiles and a PIN-protected profile for authority tests. An admin API key is neither required nor a substitute for account sign-in.
 2. Browse a library with more than 50 entries and a series with multiple seasons. Compare access and metadata to the Silo web UI. Switch profile, revisit an old navigation entry, and verify it cannot play with stale authority.

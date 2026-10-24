@@ -14,6 +14,10 @@ These are distinct concerns:
 
 The Silo client already verifies the observed resume position before reporting progress. A local comparison of absolute seeks and paused relative seeks did not establish a consistent latency advantage for either method. Do not enable a platform workaround solely from the platform name. Keep Kodi's native controls while investigating audio recovery separately. Any adopted workaround must preserve pause state, bound retries, and stop acting when another item replaces playback.
 
+The comparison used four seeks in alternating order on one SDR movie. It measured position convergence and subsequent clock advancement, not audible recovery or HDR display transitions. It cannot establish whether the alternate path solves the delayed-audio problem that motivated PM4K's workaround. Before adding a workaround, reproduce that symptom with a known soundtrack and observe audio alongside player time.
+
+PM4K also delays embedded-subtitle re-enabling until a resume seek settles, because switching streams can trigger a display reset. Apply the same ordering constraint when implementing Silo subtitle selection: verify the requested position after any stream or output transition instead of treating a seek callback as proof.
+
 PM4K is a behavioral reference. Its implementation has not been vendored into this add-on.
 
 ## Development compatibility status
@@ -26,8 +30,8 @@ This is a validation matrix, not a release support guarantee. Deployment-specifi
 | Progress and resume | Silo records position; UI resume reaches it; startup samples wait for the observed position |
 | Pause and resume | A 60-second pause keeps a stable clock and playback resumes |
 | Seeking | Forward/backward seeks converge; variable recovery latency and audible A/V sync still need qualification |
-| Stop cleanup | A stopped test session's media URL is no longer accessible; replacement/failure checks remain |
-| Episode playback | Browsing works; playback acceptance remains |
+| Stop cleanup | The episode played through the UI loses media access after stop and releases playback authority; replacement/failure checks remain |
+| Episode playback | Representative H.264 SDR episode with E-AC-3 advances for over 70 seconds |
 | Audio selection | Kodi controls retained; track changes and language/default mapping remain to be validated |
 | HDR10 and Dolby Vision/FEL | Not qualified; the initial decoder declaration is SDR only |
 | DTS-HD MA, TrueHD, Atmos | No end-to-end output qualification; decoder/stream labels do not prove AVR output |
