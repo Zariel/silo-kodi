@@ -1,5 +1,6 @@
 """Map source audio identities to observed native streams without index guessing."""
 from .client import Error
+from .tracks import NativeTracks
 
 
 _CODEC_FAMILIES = {
@@ -20,6 +21,7 @@ class SourceAudio:
         self.file_id = str(file_id)
         self.tracks = tracks
         self.language = language
+        self._native = NativeTracks(tracks, self._matches, 'audio_selection_unavailable')
 
     def _matches(self, source, native):
         codec = native.get('codec')
@@ -45,27 +47,12 @@ class SourceAudio:
         return True
 
     def identity(self, streams, current_index):
-        current = [stream for stream in streams if stream.get('index') == current_index]
-        if len(current) != 1:
-            raise Error('audio_selection_unavailable')
-        candidates = [index for index, track in enumerate(self.tracks) if self._matches(track, current[0])]
-        if len(candidates) != 1:
-            raise Error('audio_selection_unavailable')
-        index = candidates[0]
-        identity = {'id': 'file:{}:audio:{}'.format(self.file_id, index), 'index': index}
-        # Both directions must be unique; a title prefix can match two streams.
-        if self.native_index(identity, streams) != current_index:
-            raise Error('audio_selection_unavailable')
-        return identity
+        index = self._native.source_index(streams, current_index)
+        return {'id': 'file:{}:audio:{}'.format(self.file_id, index), 'index': index}
 
     def native_index(self, identity, streams):
         index = identity.get('index')
         if (type(index) is not int or not 0 <= index < len(self.tracks)
                 or identity.get('id') != 'file:{}:audio:{}'.format(self.file_id, index)):
             raise Error('audio_selection_unavailable')
-        candidates = [stream for stream in streams if self._matches(self.tracks[index], stream)]
-        if len(candidates) != 1:
-            raise Error('audio_selection_unavailable')
-        if [i for i, track in enumerate(self.tracks) if self._matches(track, candidates[0])] != [index]:
-            raise Error('audio_selection_unavailable')
-        return candidates[0]['index']
+        return self._native.native_index(index, streams)
