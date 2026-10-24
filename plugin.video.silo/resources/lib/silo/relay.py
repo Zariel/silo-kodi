@@ -147,16 +147,8 @@ class MediaRelay:
         self._lock = threading.Lock()
         self._sockets = set()
         self._closed = False
-        self._resources = {}
-        prefix = '/' + secrets.token_urlsafe(24) + '/'
-        self._paths = {}
-        for name, stream in resources.items():
-            parts = urlsplit(media_url(session.server, stream).split('|', 1)[0])
-            if parts.fragment or '/' in name or '?' in name:
-                raise Error('unsupported_playback')
-            path = prefix + name
-            self._paths[name] = path
-            self._resources[path] = (parts, dict(stream.get('headers') or {}))
+        self._prefix = '/' + secrets.token_urlsafe(24) + '/'
+        self.update(resources)
         self._server = _Server(self)
         self._thread = threading.Thread(target=self._server.serve_forever, kwargs={'poll_interval': .1})
         try:
@@ -165,8 +157,25 @@ class MediaRelay:
             self._server.server_close()
             raise
 
+    def update(self, resources):
+        updated = {}
+        for name, stream in resources.items():
+            parts = urlsplit(media_url(self._session.server, stream).split('|', 1)[0])
+            if not name or parts.fragment or any(c in name for c in '/?#'):
+                raise Error('unsupported_playback')
+            updated[self._prefix + name] = (parts, dict(stream.get('headers') or {}))
+        # Publish a fully validated plan in one assignment. Transfers already
+        # reading keep their resource; later requests use the replacement grant.
+        with self._lock:
+            if self._closed:
+                raise Error('unsupported_playback')
+            self._resources = updated
+
     def url(self, name):
-        return 'http://127.0.0.1:{}{}'.format(self._server.server_port, self._paths[name])
+        path = self._prefix + name
+        if path not in self._resources:
+            raise KeyError(name)
+        return 'http://127.0.0.1:{}{}'.format(self._server.server_port, path)
 
     def _register(self, connection):
         with self._lock:

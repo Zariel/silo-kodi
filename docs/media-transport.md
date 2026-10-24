@@ -34,6 +34,8 @@ Bound memory and concurrent transfers. Cancellation must close both sides of eac
 
 The existing final cleanup remains responsible for stopping only its owned Kodi playback and closing the Silo session. The relay does not report progress, choose another profile, or create replacement sessions.
 
+The relay can replace its resource map after a validated replan. Validate every resource before publishing the replacement; an invalid resource leaves the previous map intact. Keep the local video path stable so subsequent range requests use the replacement grant. Existing transfers finish against the resource they opened. Give each selected subtitle artifact a distinct local filename to avoid reusing Kodi's cached subtitle content, and remove retired subtitle resources. The playback owner must apply this operation; a UI must not change relay resources directly. This transport operation is implemented but not yet connected to the playback controls.
+
 HLS manifests, segment authorization, and quality replans need a separate extension of this contract. Do not advertise those deliveries merely because original byte ranges work through the relay.
 
 ## Evidence and acceptance
@@ -41,6 +43,8 @@ HLS manifests, segment authorization, and quality replans need a separate extens
 An ignored target prototype compared an eight-MiB direct read with a relayed read: status, content range, length, and SHA-256 matched. A real token refresh changed the authority used by the next successful suffix-range request. HEAD preserved the source length. Short throughput samples show feasibility, not sustained bitrate qualification. Private measurements and fixture identities remain outside version control.
 
 The integrated add-on passes the real-video smoke loop. Target checks also confirm selected text subtitles, a 60-second pause, resume and seeking after real credential rotation, and preservation of the new video during external replacement. The playback identity stays unchanged across rotation. A controlled upstream verifies range responses, current authority on new requests, profile rejection, redirect refusal, truncation, concurrency, and transfer cancellation. These tests do not prove behavior across natural expiry or maximum bitrate.
+
+An API-and-transport check on the target verifies subtitle On and Off replans within one session. After each resource replacement, the unchanged local video URL returns matching original bytes. The selected WebVTT artifact is readable; after Off, its retired URL returns 404. This check does not open Kodi playback and therefore does not establish mid-playback subtitle rendering or remote-menu behavior.
 
 Release qualification must cover:
 

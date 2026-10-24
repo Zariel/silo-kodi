@@ -144,6 +144,29 @@ class Transport(unittest.TestCase):
         self.assertEqual(headers['X-Profile-Id'], 'viewer')
         self.assertEqual(headers['X-Grant'], 'plan')
 
+    def test_replan_replaces_grants_without_changing_video_url(self):
+        video = self.relay.url('video')
+        retired = self.relay.url('redirect')
+        self.relay.update({'video': {'url': '/media?st=replanned', 'headers': {'X-Grant': 'replacement'}},
+                           'subtitle-2.vtt': {'url': '/subtitles/2'}})
+        self.assertEqual(self.relay.url('video'), video)
+        self.assertEqual(self.fetch(headers={'Range': 'bytes=2-5'})[2], b'2345')
+        path, headers = self.origin.requests[-1]
+        self.assertEqual(path, '/media?st=replanned')
+        self.assertEqual(headers['X-Grant'], 'replacement')
+        self.assertEqual(self.fetch('subtitle-2.vtt')[0], 200)
+        with self.assertRaises(HTTPError) as raised:
+            urlopen(retired, timeout=3)
+        with raised.exception as response:
+            self.assertEqual(response.code, 404)
+
+    def test_invalid_replan_preserves_previous_resources(self):
+        with self.assertRaises(Error):
+            self.relay.update({'video': {'url': '/replacement'},
+                               'subtitle.vtt': {'url': 'https://other.example.test/subtitle'}})
+        self.assertEqual(self.fetch()[0], 200)
+        self.assertEqual(self.origin.requests[-1][0], '/media?st=signed%2Bgrant')
+
     def test_revoked_profile_never_reaches_origin(self):
         self.authority.allowed = False
         self.assertEqual(self.fetch()[0], 403)
