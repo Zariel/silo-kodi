@@ -1,6 +1,6 @@
 # Initial release acceptance
 
-Version `0.3.0` provides the planned browsing client for Kodi 21 on the tested CoreELEC setup. The original acceptance package matched the reproducible local ZIP and the downloaded GitHub CI artifact; subsequent browsing changes are described below. The supported workflows below have passed representative device checks, backed by 119 automated tests. The artifact is ready for local use and a GitHub prerelease; no release has been published as part of these checks.
+Version `0.3.0` provides the planned browsing client for Kodi 21 on the tested CoreELEC setup. The original acceptance package matched the reproducible local ZIP and the downloaded GitHub CI artifact; subsequent browsing changes are described below. The supported workflows below have passed representative device checks, backed by 123 automated tests. The artifact is ready for local use and a GitHub prerelease; no release has been published as part of these checks.
 
 All endpoints, fixture identities, account data, screenshots, and raw device results remain in ignored local testing storage. The [compatibility matrix](playback-references.md) records the scope of media/output evidence; [testing procedures](testing.md) describe reproduction and cleanup.
 
@@ -28,7 +28,11 @@ All endpoints, fixture identities, account data, screenshots, and raw device res
 
 Library and expanded Home grids preload cursor pages without a **Load more** card. The local suite covers overlap deduplication, filtered empty pages, repeated cursors, failure recovery, stale navigation results, and profile authority. A device check observed a library grow from 100 to 150 cards without a loading banner and retain the selected card through details and Back.
 
-The sidebar collapses to icons when content has focus and expands its labels when navigation regains focus. Captures verify both layouts, but some icons intermittently disappear after changing libraries. This remains unresolved. Expanded Home automatic paging, exact viewport placement during a background append, and final sidebar rendering still need device acceptance. Target interaction is paused at the user's request; later local changes have not been deployed or requalified against the GitHub artifact.
+The sidebar collapses to icons when content has focus and expands its labels when navigation regains focus. Captures verify both layouts, but some icons intermittently disappear after changing libraries. This remains unresolved. Expanded Home automatic paging, exact viewport placement during a background append, and final sidebar rendering still need device acceptance. Target checks resumed with the receiver showing another input. The browsing/navigation build is deployed; it has not been requalified against the original GitHub artifact.
+
+## Playback navigation follow-up
+
+The Now playing sidebar destination is removed. A short device check using the installed browser and a real episode verified Back from fullscreen to the originating collection, preservation of the selected title and player identity, opening Quality through the context menu, and Back returning to the same fullscreen player. The owned video stopped and the test window closed normally. Local tests cover navigation history, profile-bound playback metadata, menu access, and cleanup. This test ran with the receiver on another input and does not add HDMI or audible-output evidence.
 
 ## Known limitations
 
