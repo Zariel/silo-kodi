@@ -2,13 +2,13 @@
 
 A browsing client for Silo, targeting Kodi 21 on CoreELEC. The intended client uses Silo account authentication and profiles, browses libraries on demand, and delegates media playback to Kodi without syncing the catalog into Kodi's library.
 
-**Status:** playback in validation. Version `0.3.0` provides QR sign-in, profile selection, library and detail screens, native video playback with Silo progress reporting, quality selection, and text subtitle selection. Representative movies, episodes, pause, resume, start-over, combined subtitle/quality changes, HDR10, and Dolby Vision with receiver-confirmed TrueHD/Atmos pass short checks on the test device. Natural token expiry, sustained bitrate, broader device/output coverage, and additional subtitle formats still need qualification.
+**Status:** playback in validation. Version `0.3.0` provides QR sign-in, profile selection, library and detail screens, native video playback with Silo progress reporting, quality selection, and text/embedded PGS subtitle selection. Representative movies, episodes, pause, resume, start-over, combined subtitle/quality changes, HDR10, and Dolby Vision with receiver-confirmed TrueHD/Atmos pass short checks on the test device. A ten-minute high-bitrate playback check passes sampled clock and buffering checks. Natural token expiry, broader bitrate/output coverage, and additional subtitle formats still need qualification.
 
 Original-file presentation is delegated to Kodi, with declared codec eligibility up to 2160p. HDR, Dolby Vision/FEL, and audio passthrough depend on the device, Kodi build, and configuration. See the compatibility evidence below; these are not universal Kodi support claims.
 
 The [six-milestone delivery plan](docs/design.md#delivery-sequence-and-acceptance) includes making Silo Home the main page after playback quality and subtitles, using server-provided sections and ordering with a default-order compatibility fallback.
 
-During playback, return to Silo's browser and choose **Now playing → Subtitles** to select a server-provided text track or **Off**. **Now playing → Return to video** restores fullscreen playback. Kodi's normal controls remain available for pause, seek, and audio.
+During playback, return to Silo's browser and choose **Now playing → Subtitles** to select a supported text or embedded PGS track, or **Off**. PGS uses native rendering for original MKV playback and server burn-in for supported lower-quality HLS. Use this menu for subtitle changes; selections made directly in Kodi’s subtitle OSD are not yet reconciled with Silo on a replan. **Now playing → Return to video** restores fullscreen playback. Kodi's normal controls remain available for pause, seek, and audio.
 
 Choose **Now playing → Quality** for Silo's available qualities or **Auto**. Changing quality preserves position and pause while reopening the video. The initial transcoded path supports SDR H.264/AAC HLS; other delivery combinations remain unqualified.
 

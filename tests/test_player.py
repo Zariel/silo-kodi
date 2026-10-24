@@ -14,7 +14,8 @@ class Lifetime(unittest.TestCase):
         state = SimpleNamespace(file=None, closed=False, relay_closed=False, clock=0, player=None,
                                 subtitles=[], relay_updated=False, item_properties={}, position=20,
                                 paused=scenario.startswith('quality') or scenario == 'hls_subtitle',
-                                done=False, samples=[], opens=[], audio_index=1, audio_selections=[])
+                                done=False, samples=[], opens=[], audio_index=1, audio_selections=[],
+                                subtitle_index=None, subtitle_enabled=False, subtitle_selections=[])
         url = 'https://silo.example.test/api/v2/stream/owned'
 
         class Player:
@@ -59,7 +60,12 @@ class Lifetime(unittest.TestCase):
                 raise RuntimeError('Player rejected subtitle')
 
             def showSubtitles(self, enabled):
-                pass
+                state.subtitle_enabled = enabled
+
+            def setSubtitleStream(self, index):
+                state.subtitle_selections.append(index)
+                if scenario != 'embedded_timeout':
+                    state.subtitle_index = index
 
             def setAudioStream(self, index):
                 state.audio_selections.append(index)
@@ -77,10 +83,17 @@ class Lifetime(unittest.TestCase):
         class Attempt:
             def __init__(self, *args, **kwargs):
                 self.audio_tracks = None
+                self.subtitle_tracks = []
+                self.native_subtitles = False
+                self.embedded_subtitle_index = None
                 self.body = {'quality_preference': 'auto'}
                 self.plan = {'stream': {}, 'timeline': {'player_start_seconds': 0}, 'effective_media_file_id': 'file'}
                 self.plan['delivery'] = 'server_transcode_hls' if scenario == 'hls_subtitle' else 'original_http'
                 self.plan['subtitle'] = {'artifact': {'format': 'vtt'}}
+                if scenario.startswith('embedded'):
+                    self.native_subtitles = True
+                    self.subtitle_tracks = [{'index': 7, 'embedded_title': 'English'}]
+                    self.embedded_subtitle_index = 7
                 if scenario.startswith('quality_audio'):
                     self.audio_tracks = [{'codec': 'dts', 'channels': 6}, {'codec': 'ac3', 'channels': 2}]
                     self.plan['selected_tracks'] = {'audio': {'id': 'file:file:audio:0', 'index': 0}}
@@ -96,6 +109,9 @@ class Lifetime(unittest.TestCase):
                 if state.opens or scenario == 'hls_subtitle':
                     state.done = True
                     state.reported_audio = state.audio_index
+                elif scenario.startswith('embedded'):
+                    state.reported_subtitle = (state.subtitle_index, state.subtitle_enabled)
+                    state.done = True
                 elif scenario.startswith('quality_audio'):
                     state.audio_index = 0
 
@@ -161,21 +177,26 @@ class Lifetime(unittest.TestCase):
             if scenario.startswith('quality_audio'):
                 controls.take.side_effect = [None, {'quality': 'auto'}, None]
             if scenario == 'quality_audio_ambiguous':
-                def published(*args):
+                def published(*args, **kwargs):
                     if controls.publish.call_count == 2:
                         state.refused_while_playing = state.file == url
                         state.done = True
                 controls.publish.side_effect = published
             if scenario == 'hls_subtitle':
                 controls.take.side_effect = [{'subtitle': None}, None]
-            def audio_state():
+            def audio_state(properties):
                 if scenario == 'quality_audio_replacement' and state.opens:
                     state.file = 'https://other.example.test/replacement'
+                if 'subtitles' in properties:
+                    if scenario == 'embedded_replacement':
+                        state.file = 'https://other.example.test/replacement'
+                    return {'subtitles': [{'index': 2, 'name': 'English'}],
+                            'currentsubtitle': {'index': state.subtitle_index}, 'subtitleenabled': state.subtitle_enabled}
                 return {'audiostreams': [{'index': 0, 'codec': 'ac3', 'channels': 2},
                                          {'index': 1, 'codec': 'dtshd_ma', 'channels': 6}],
                         'currentaudiostream': {'index': state.audio_index}}
 
-            with patch.object(module, '_audio_state', audio_state), patch.object(module, 'Attempt', Attempt), patch.object(module, 'MediaRelay', Relay), patch.object(module, 'PlaybackControls', return_value=controls), patch.object(module.time, 'monotonic', lambda: state.clock):
+            with patch.object(module, '_track_state', audio_state), patch.object(module, 'Attempt', Attempt), patch.object(module, 'MediaRelay', Relay), patch.object(module, 'PlaybackControls', return_value=controls), patch.object(module.time, 'monotonic', lambda: state.clock):
                 session = SimpleNamespace(store=SimpleNamespace(playback_lock=nullcontext))
                 module.play(1, session, 'profile', 'file', 'Title', source=source)
         return state
@@ -186,6 +207,23 @@ class Lifetime(unittest.TestCase):
         self.assertEqual(state.audio_selections, [0])
         self.assertEqual(state.reported_audio, 0)
         self.assertEqual(state.samples[-1], (20, True))
+
+    def test_embedded_subtitle_is_selected_and_observed_before_reporting(self):
+        state = self.run_playback('embedded')
+        self.assertEqual(state.subtitle_selections, [2])
+        self.assertEqual(state.reported_subtitle, (2, True))
+        self.assertEqual(state.samples, [(20, False)])
+
+    def test_embedded_selection_timeout_closes_owned_playback(self):
+        state = self.run_playback('embedded_timeout')
+        self.assertEqual(state.samples, [])
+        self.assertTrue(state.closed)
+        self.assertIsNone(state.file)
+
+    def test_embedded_selection_preserves_replacement_playback(self):
+        state = self.run_playback('embedded_replacement')
+        self.assertEqual(state.subtitle_selections, [])
+        self.assertEqual(state.file, 'https://other.example.test/replacement')
 
     def test_ambiguous_audio_keeps_current_playback_without_replanning(self):
         state = self.run_playback('quality_audio_ambiguous')

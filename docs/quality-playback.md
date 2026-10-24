@@ -1,6 +1,6 @@
 # Select playback quality without losing position
 
-Status: quality controls, replans, and native player transitions are implemented. The installed add-on passes original → 360p → Auto → 360p through the remote menu, including paused changes and subsequent resume. Capabilities advertise original HTTP and SDR H.264/AAC HLS. Combined text-subtitle/quality transitions pass representative checks. A selected nondefault AC3 soundtrack survives original → 360p → Auto on a multi-audio fixture. Broader track metadata, interruption cases, and media qualification remain unfinished.
+Status: quality controls, replans, and native player transitions are implemented. The installed add-on passes original → 360p → Auto → 360p through the remote menu, including paused changes and subsequent resume. Capabilities advertise original HTTP and SDR H.264/AAC HLS. Combined text-subtitle and embedded PGS/quality transitions pass representative checks. A selected nondefault AC3 soundtrack survives original → 360p → Auto on a multi-audio fixture. Broader track metadata, interruption cases, and media qualification remain unfinished.
 
 ## Requirement and ownership
 
@@ -16,6 +16,16 @@ Silo owns the quality ladder, encoding, and plan. Kodi owns HLS demuxing, decodi
 - Original HTTP and transcoded HLS use a complete timeline: source offset zero and local seeking to `player_start_seconds`. Copy-remux HLS has a different, incomplete timeline and requires server reanchoring. Do not enable remux HLS merely because transcoded HLS works.
 - A successful replan can commit a new server plan before the player opens it. Retain the newest server identity even if local playback fails; an old rendered plan is not authority to replan from a superseded ID.
 - With `header_authenticated_media_v1`, the inspected transcode playlist and its segments are served through the authenticated API origin. A fixed bearer handed to Kodi still needs renewal for later requests.
+
+## Embedded PGS and burned captions
+
+For MKV sources containing PGS, negotiate `embedded_subtitles_v1` and advertise native embedded PGS only on original HTTP delivery. Do not advertise bitmap sidecar rendering: the inventory can expose a `.sup` artifact even when the chosen plan uses native embedded delivery. HLS has a separate capability declaration and can request server burn-in.
+
+Keep the three identities distinct: the inventory's opaque track ID, the decision's global FFmpeg stream index, and Kodi's subtitle-list index. The playback owner resolves the source metadata for the global index, then requires a unique match in both directions against Kodi's language, title, and disposition flags. Audio and subtitles share this uniqueness contract. Ambiguity during menu preflight leaves the working plan intact. After a committed change, verify the requested native selection and subtitle visibility before publishing completion.
+
+Accept native embedded decisions only for the negotiated original delivery. Accept burn-in only on supported transcoded HLS; it requires no subtitle artifact and must not enable an additional native subtitle. Preserve the opaque selection across quality changes and reject a replan that returns another track. Every HLS transition reopens the demuxer, including switching burned captions off.
+
+Device checks visibly compare one known PGS cue in original MKV, 360p HLS, and returned Auto playback; Off removes that cue in both deliveries. Initial SDH selection and same-language SDH-to-English switching also pass. These checks cover an SDR H.264 fixture, not HDR subtitle combinations or every quality rung. Native Kodi subtitle OSD changes are not yet reconciled into Silo replans; use the Silo subtitle menu. Authored ASS/fonts and other bitmap formats remain unqualified.
 
 ## Delivery alternatives
 

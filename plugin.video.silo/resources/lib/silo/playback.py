@@ -29,6 +29,7 @@ def capabilities():
     context['deliveries']['hls'] = dict(context['deliveries']['original_http'],
                                       containers=['hls'], video_codecs=['h264'],
                                       audio_decode_codecs=['aac'], max_channels=2,
+                                      subtitles=dict(context['deliveries']['original_http']['subtitles']),
                                       validated_claims=[])
     return decoder, context
 
@@ -79,14 +80,20 @@ class Attempt:
         self.plan = None
         self.plan_attempt_id = None
         self.subtitle_url = None
+        self.embedded_subtitle_index = None
         self.ended = False
         self.audio_tracks = None
+        self.subtitle_tracks = []
+        self.native_subtitles = False
+        container = None
         if content_id is not None:
             versions = self._request('GET', '/catalog/items/' + quote(str(content_id), safe='') + '/versions')['items']
             version = next((item for item in versions if str(item['file_id']) == str(file_id)), None)
             if version is None:
                 raise Error('unsupported_playback')
             self.audio_tracks = version.get('audio_tracks')
+            self.subtitle_tracks = version.get('subtitle_tracks') or []
+            container = version.get('container')
         capability = self._request('GET', '/playback/capabilities')
         if not capability.get('allowed') or 3 not in capability.get('protocol_versions', []):
             raise Error('unsupported_playback')
@@ -94,11 +101,19 @@ class Attempt:
         decoder, context = capabilities()
         if self.audio_tracks:
             context['deliveries']['original_http']['validated_claims'].append('client_selected_audio_track_v1')
+        self.native_subtitles = (container == 'mkv' and 'embedded_subtitles_v1' in capability.get('features', [])
+                                 and any(track.get('codec') == 'hdmv_pgs_subtitle' for track in self.subtitle_tracks))
+        if self.native_subtitles:
+            context['deliveries']['original_http']['subtitles']['native_embedded'] = [{
+                'container': 'mkv', 'codecs': ['hdmv_pgs_subtitle'], 'track_identity': 'ffmpeg_stream_index',
+                'ass_styling': False, 'font_attachments': False}]
         self.body = {'installation_id': self.installation, 'protocol_version': 3,
                      'client_features': ['playback_plan_v3'], 'file_id': str(file_id),
                      'profile_id': profile_id, 'playback_attempt_id': str(uuid.uuid4()),
                      'quality_preference': 'auto', 'subtitle_fidelity_preference': 'compatible',
                      'client_capabilities': decoder, 'client_playback_context': context}
+        if self.native_subtitles:
+            self.body['client_features'].append('embedded_subtitles_v1')
         if 'fixed_media_file_v1' in capability.get('features', []):
             self.body['allow_alternate_versions'] = False
         if 'header_authenticated_media_v1' in capability.get('features', []):
@@ -166,12 +181,18 @@ class Attempt:
         expected_audio = tracks.get('audio')
         if expected_audio and self.plan.get('selected_tracks', {}).get('audio', {}).get('id') != expected_audio['id']:
             raise Error('audio_selection_unavailable')
+        expected_subtitle = tracks.get('subtitle')
+        decision = self.plan.get('subtitle', {})
+        if ((expected_subtitle and decision.get('track_id') != expected_subtitle['id'])
+                or (operation == 'track_change' and not expected_subtitle and decision.get('mode') != 'off')):
+            raise Error('subtitle_selection_unavailable')
         return url
 
     def _accept(self, result):
         self.plan = result.get('playback_plan')
         self.plan_attempt_id = str(uuid.uuid4())
         self.subtitle_url = None
+        self.embedded_subtitle_index = None
         if (result.get('outcome') != 'playable' or not self.session_id or not self.plan
                 or result.get('session_id') != self.session_id):
             raise Error('unsupported_playback')
@@ -186,7 +207,23 @@ class Attempt:
                 or timeline.get('timeline_offset_seconds') != 0):
             raise Error('unsupported_playback')
         authority = self.session.media_headers(self.profile_id)
-        self.subtitle_url = subtitle_url(self.session.server, self.plan.get('subtitle', {'mode': 'off'}), authority)
+        decision = self.plan.get('subtitle', {'mode': 'off'})
+        embedded = decision.get('embedded')
+        if embedded is not None:
+            index = embedded.get('stream_index')
+            if (not self.native_subtitles or delivery != 'original_http' or decision.get('mode') != 'render'
+                    or type(index) is not int or index < 0 or not decision.get('track_id')
+                    or decision.get('artifact') or decision.get('hls_rendition')
+                    or not any(track.get('index') == index and track.get('codec') == 'hdmv_pgs_subtitle'
+                               for track in self.subtitle_tracks)):
+                raise Error('subtitle_selection_unavailable')
+            self.embedded_subtitle_index = index
+        elif decision.get('mode') == 'burn_in':
+            if (delivery != 'server_transcode_hls' or not decision.get('track_id')
+                    or decision.get('artifact') or decision.get('hls_rendition')):
+                raise Error('subtitle_selection_unavailable')
+        else:
+            self.subtitle_url = subtitle_url(self.session.server, decision, authority)
         return media_url(self.session.server, self.plan['stream'], authority)
 
     def sample(self, position, paused):

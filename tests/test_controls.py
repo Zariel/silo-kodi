@@ -39,6 +39,17 @@ class Controls(unittest.TestCase):
                 self.owner.publish(self.plan)
         self.assertNotIn('private', json.dumps(self.properties))
 
+    def test_pgs_sidecar_is_not_offered_without_native_support(self):
+        plan = {'subtitle': {'mode': 'off', 'inventory': [{'track_id': 'pgs', 'label': 'English',
+                'source': 'embedded', 'codec': 'hdmv_pgs_subtitle', 'delivery': 'sidecar'}]}}
+        self.dialog.select.return_value = 1
+        self.owner.publish(plan)
+        self.module.now_playing()
+        self.assertIsNone(self.owner.take())
+        self.owner.publish(plan, native_subtitles=True)
+        self.module.now_playing()
+        self.assertEqual(self.owner.take()['subtitle'], 'pgs')
+
     def test_quality_menu_keeps_auto_distinct_from_delivered_rung(self):
         self.plan['available_qualities'] = [{'label': '360p'}, {'label': '720p-high'}]
         self.plan['active_quality'] = '360p'

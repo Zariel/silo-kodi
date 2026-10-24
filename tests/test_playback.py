@@ -24,6 +24,8 @@ class Server:
         self.subtitle = {'mode': 'off'}
         self.replans = 0
         self.versions = []
+        self.features = ['fixed_media_file_v1']
+        self.subtitle_mode = 'render'
         self.tracks = {'audio': {'id': 'audio-commentary', 'index': 2}}
         self.timeline = {'can_seek_anywhere': True, 'player_start_seconds': 24, 'timeline_offset_seconds': 0}
 
@@ -37,11 +39,15 @@ class Server:
             self.fail = None
             raise Error('connection_failed')
         if path == '/playback/capabilities':
-            return {'allowed': True, 'protocol_versions': [3], 'installation_id': 'server-install', 'features': ['fixed_media_file_v1']}
+            return {'allowed': True, 'protocol_versions': [3], 'installation_id': 'server-install', 'features': self.features}
         if path.endswith('/replan'):
             self.replans += 1
             self.tracks = body['selected_tracks']
-            self.subtitle = dict(self.subtitle, mode='render' if 'subtitle' in body['selected_tracks'] else 'off')
+            self.subtitle = dict(self.subtitle, mode=self.subtitle_mode if 'subtitle' in body['selected_tracks'] else 'off')
+            if 'subtitle' in body['selected_tracks']:
+                self.subtitle['track_id'] = body['selected_tracks']['subtitle']['id']
+            else:
+                self.subtitle.pop('track_id', None)
         if path == '/playback/start' or path.endswith('/replan'):
             return {'outcome': 'playable', 'session_id': 'session-1', 'playback_plan': {
                 'plan_id': 'plan-' + str(self.replans), 'plan_attempt_key': 'original-recipe',
@@ -55,6 +61,49 @@ class Server:
 
 
 class Playback(unittest.TestCase):
+    def test_pgs_replans_use_native_original_then_burned_in_hls(self):
+        server = Server()
+        server.features.append('embedded_subtitles_v1')
+        server.versions = [{'file_id': '42', 'container': 'mkv',
+                            'subtitle_tracks': [{'index': 7, 'codec': 'hdmv_pgs_subtitle'}]}]
+        server.subtitle = {'mode': 'off', 'inventory': [{'track_id': 'pgs'}]}
+        attempt = Attempt(server, 'viewer', '42', content_id='movie')
+        attempt.start()
+        deliveries = attempt.body['client_playback_context']['deliveries']
+        self.assertIn('embedded_subtitles_v1', attempt.body['client_features'])
+        self.assertEqual(deliveries['original_http']['subtitles']['native_embedded'][0]['track_identity'], 'ffmpeg_stream_index')
+        self.assertNotIn('native_embedded', deliveries['hls']['subtitles'])
+
+        server.subtitle['embedded'] = {'stream_index': 7}
+        attempt.select_subtitle('pgs', 20)
+        self.assertEqual(attempt.embedded_subtitle_index, 7)
+        self.assertIsNone(attempt.subtitle_url)
+
+        server.subtitle.pop('embedded')
+        server.subtitle_mode = 'burn_in'
+        server.delivery = 'server_transcode_hls'
+        attempt.select_quality('360p', 22)
+        self.assertIsNone(attempt.embedded_subtitle_index)
+        self.assertIsNone(attempt.subtitle_url)
+        self.assertEqual(attempt.plan['subtitle']['track_id'], 'pgs')
+        attempt.select_subtitle(None, 24)
+        self.assertEqual(attempt.plan['subtitle']['mode'], 'off')
+
+    def test_invalid_native_and_burn_in_decisions_are_rejected(self):
+        for delivery, decision in (
+                ('original_http', {'mode': 'render', 'track_id': 'pgs', 'embedded': {'stream_index': 7}}),
+                ('original_http', {'mode': 'burn_in', 'track_id': 'pgs'}),
+                ('server_transcode_hls', {'mode': 'burn_in', 'track_id': 'pgs', 'artifact': {'url': '/sub.sup'}})):
+            with self.subTest(delivery=delivery, decision=decision):
+                server = Server()
+                server.delivery = delivery
+                server.subtitle = decision
+                attempt = Attempt(server, 'viewer', '42')
+                with self.assertRaises(Error):
+                    attempt.start()
+                attempt.stop()
+                self.assertEqual(server.calls[-1][:2], ('DELETE', '/playback/session-1'))
+
     def test_inventory_is_fetched_under_playback_profile_and_scopes_audio_claim(self):
         server = Server()
         server.versions = [{'file_id': '42', 'audio_tracks': [{'codec': 'ac3', 'channels': 2}]}]

@@ -8,6 +8,7 @@ import xbmcplugin
 
 from .client import Error
 from .audio import SourceAudio
+from .subtitles import SourceSubtitles
 from .controls import PlaybackControls
 from .playback import Attempt
 from .relay import MediaRelay
@@ -54,19 +55,19 @@ def _item(title, url, source, plan):
     return item
 
 
-def _audio_state():
+def _track_state(properties):
     def request(method, params=None):
         response = json.loads(xbmc.executeJSONRPC(json.dumps(
             {'jsonrpc': '2.0', 'id': 1, 'method': method, 'params': params or {}})))
         if 'result' not in response:
-            raise Error('audio_selection_unavailable')
+            raise Error('playback_state_unavailable')
         return response['result']
 
     players = [item for item in request('Player.GetActivePlayers') if item.get('type') == 'video']
     if len(players) != 1:
-        raise Error('audio_selection_unavailable')
+        raise Error('playback_state_unavailable')
     return request('Player.GetProperties', {'playerid': players[0]['playerid'],
-                                           'properties': ['audiostreams', 'currentaudiostream']})
+                                           'properties': properties})
 
 
 def play(handle, session, profile_id, file_id, title, start_position=None, source=None, subtitle_track_id=None, content_id=None):
@@ -90,6 +91,8 @@ def play(handle, session, profile_id, file_id, title, start_position=None, sourc
                                   subtitle_track_id=subtitle_track_id, content_id=content_id)
                 audio = SourceAudio(file_id, attempt.audio_tracks,
                                     lambda value: xbmc.convertLanguage(value, xbmc.ISO_639_2)) if attempt.audio_tracks else None
+                subtitles = SourceSubtitles(attempt.subtitle_tracks,
+                                            lambda value: xbmc.convertLanguage(value, xbmc.ISO_639_2)) if attempt.native_subtitles else None
                 attempt.start()
                 video_name = 'video'
                 resources = {video_name: attempt.plan['stream']}
@@ -110,6 +113,7 @@ def play(handle, session, profile_id, file_id, title, start_position=None, sourc
                 seek_deadline = None
                 tracks_applied = False
                 audio_deadline = None
+                subtitle_deadline = None
                 while not monitor.abortRequested():
                     if pending_url is not None:
                         # Core changes can emit an old stop callback. Commit only
@@ -174,7 +178,7 @@ def play(handle, session, profile_id, file_id, title, start_position=None, sourc
                     if not tracks_applied and audio and attempt.plan.get('delivery') == 'original_http':
                         identity = attempt.plan.get('selected_tracks', {}).get('audio')
                         if identity:
-                            observed = _audio_state()
+                            observed = _track_state(['audiostreams', 'currentaudiostream'])
                             native_index = audio.native_index(identity, observed['audiostreams'])
                             if not _owns(player, url, source):
                                 break
@@ -194,17 +198,25 @@ def play(handle, session, profile_id, file_id, title, start_position=None, sourc
                             raise Error('unsupported_playback')
                         previous_delivery = attempt.plan.get('delivery')
                         audio_track = None
-                        if previous_delivery == 'original_http' and attempt.plan.get('selected_tracks', {}).get('audio'):
-                            try:
-                                if audio is None:
-                                    raise Error('audio_selection_unavailable')
-                                observed = _audio_state()
-                                audio_track = audio.identity(observed['audiostreams'], observed['currentaudiostream'].get('index'))
-                            except Error as exc:
-                                # Identity uncertainty must not retire a working plan.
-                                controls.publish(attempt.plan, attempt.body['quality_preference'])
-                                xbmcgui.Dialog().notification('Silo', str(exc), xbmcgui.NOTIFICATION_ERROR)
-                                continue
+                        try:
+                            if previous_delivery == 'original_http':
+                                if attempt.plan.get('selected_tracks', {}).get('audio'):
+                                    if audio is None:
+                                        raise Error('audio_selection_unavailable')
+                                    observed = _track_state(['audiostreams', 'currentaudiostream'])
+                                    audio_track = audio.identity(observed['audiostreams'], observed['currentaudiostream'].get('index'))
+                                selected = next((track for track in attempt.plan.get('subtitle', {}).get('inventory', [])
+                                                 if track['track_id'] == request.get('subtitle')), None)
+                                if selected and selected.get('codec') == 'hdmv_pgs_subtitle':
+                                    if subtitles is None:
+                                        raise Error('subtitle_selection_unavailable')
+                                    observed = _track_state(['subtitles'])
+                                    subtitles.check_selection(selected, observed['subtitles'])
+                        except Error as exc:
+                            # Identity uncertainty must not retire a working plan.
+                            controls.publish(attempt.plan, attempt.body['quality_preference'], native_subtitles=attempt.native_subtitles)
+                            xbmcgui.Dialog().notification('Silo', str(exc), xbmcgui.NOTIFICATION_ERROR)
+                            continue
                         if not _owns(player, url, source):
                             break
                         quality_change = 'quality' in request
@@ -230,6 +242,7 @@ def play(handle, session, profile_id, file_id, title, start_position=None, sourc
                         relay.update(resources)
                         tracks_applied = False
                         audio_deadline = None
+                        subtitle_deadline = None
                         if reopen:
                             pending_url = url
                             url = relay.url(video_name)
@@ -245,13 +258,27 @@ def play(handle, session, profile_id, file_id, title, start_position=None, sourc
                             player.play(url, _item(title, url, source, attempt.plan))
                             continue
                     if not tracks_applied:
-                        if attempt.subtitle_url:
+                        if attempt.embedded_subtitle_index is not None:
+                            observed = _track_state(['subtitles', 'currentsubtitle', 'subtitleenabled'])
+                            native_index = subtitles.native_index(attempt.embedded_subtitle_index, observed['subtitles'])
+                            if not _owns(player, url, source):
+                                break
+                            if observed['currentsubtitle'].get('index') != native_index or not observed['subtitleenabled']:
+                                if subtitle_deadline is None:
+                                    player.setSubtitleStream(native_index)
+                                    player.showSubtitles(True)
+                                    subtitle_deadline = time.monotonic() + 15
+                                elif time.monotonic() > subtitle_deadline:
+                                    raise Error('subtitle_selection_unavailable')
+                                monitor.waitForAbort(.25)
+                                continue
+                        elif attempt.subtitle_url:
                             player.setSubtitles(relay.url(subtitle_name))
                             player.showSubtitles(True)
                         else:
                             player.showSubtitles(False)
                         tracks_applied = True
-                        controls.publish(attempt.plan, attempt.body['quality_preference'])
+                        controls.publish(attempt.plan, attempt.body['quality_preference'], native_subtitles=attempt.native_subtitles)
                     if time.monotonic() >= next_report:
                         try:
                             attempt.sample(last_position, paused)

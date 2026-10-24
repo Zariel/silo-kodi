@@ -38,6 +38,8 @@ class Error(Exception):
             'playback_active': 'Stop playback before changing the account, profile, or server.',
             'unsupported_playback': 'Silo could not provide a supported stream for this file.',
             'audio_selection_unavailable': 'Cannot preserve this audio track for the playback change.',
+            'subtitle_selection_unavailable': 'Cannot select this subtitle track safely for this playback.',
+            'playback_state_unavailable': 'Could not read Kodi playback state.',
         }
         # Never display arbitrary response bodies or URLs containing credentials.
         super().__init__(messages.get(code, 'Silo refused the request (HTTP {}).'.format(status)))

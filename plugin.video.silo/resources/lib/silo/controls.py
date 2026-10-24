@@ -24,7 +24,7 @@ class PlaybackControls:
         self.window.clearProperty(_STATE)
         self.window.clearProperty(_REQUEST)
 
-    def publish(self, plan, quality='auto'):
+    def publish(self, plan, quality='auto', native_subtitles=False):
         subtitle = plan.get('subtitle') or {}
         tracks = []
         for track in subtitle.get('inventory', []):
@@ -33,8 +33,10 @@ class PlaybackControls:
                 label += ' · Forced'
             if track.get('hearing_impaired'):
                 label += ' · SDH'
+            pgs = track.get('codec') == 'hdmv_pgs_subtitle'
             tracks.append({'id': track['track_id'], 'label': label,
-                           'supported': track.get('delivery') == 'sidecar'})
+                           'supported': ((pgs and native_subtitles and track.get('source') == 'embedded')
+                                         or (not pgs and track.get('delivery') == 'sidecar'))})
         # Publish only UI metadata, never stream URLs, headers, or credentials.
         self.state = {'revision': str(uuid.uuid4()), 'tracks': tracks,
                       'qualities': [entry['label'] for entry in plan.get('available_qualities', [])],
