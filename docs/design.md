@@ -28,7 +28,7 @@ Use Python 3.11 and standard-library HTTP/JSON. Kodi's Python APIs are supplied 
 
 Provide a simple, remote-first experience that follows Silo's visual style. The reference is Silo's web UI, adapted for viewing across a room rather than copied at desktop density. Keep reference screenshots and deployment-specific UI examples in ignored `.local-testing/ui-references/`.
 
-The inspected Midnight Cinema theme uses near-black surfaces, restrained borders, light text, white primary actions, and rounded cards. Artwork, title information, and Play/Resume should dominate. Use a conspicuous focus indicator, predictable directional navigation, and readable text at normal TV distance. Restore focus and scroll position after returning from details or playback. Loading and failure states must remain navigable with the remote.
+Use near-black surfaces, restrained borders, light text, rounded poster cards, and a muted lavender accent for primary actions and active navigation. Artwork, title information, and Play/Resume should dominate. Keep the accent sparse so posters carry most of the color. Use a conspicuous focus indicator, predictable directional navigation, and readable text at normal TV distance. Restore focus and scroll position after returning from details or playback. Loading and failure states must remain navigable with the remote.
 
 | Presentation approach | Tradeoff |
 | --- | --- |
@@ -39,6 +39,13 @@ The inspected Midnight Cinema theme uses near-black surfaces, restrained borders
 Prototype an add-on-owned poster grid and detail screen through `xbmcgui.WindowXML` before building the complete interface. Verify remote focus, scrolling, responsiveness, and return from playback on CoreELEC. Use this result to settle window lifetime and playback-session ownership together; the earlier plugin-invocation monitor proposal remains provisional.
 
 Limit the first interface to server connection/device sign-in, a profile picker with PIN entry, a library selector and paginated poster grid, title details with Play/Resume and version choice, and season/episode selection. Include profile switching in a consistent location. Keep Kodi's normal playback OSD for pause, seek, audio, and subtitle selection. Continue Watching can follow once server resume is reliable; do not reproduce the web dashboard in the first milestone.
+
+### Initial TV layouts
+
+- **Browse:** a narrow left navigation rail with library names and profile access, followed by a spacious poster grid. Begin with approximately six posters across the content area at 1080p and adjust after viewing on a TV. Show the title and secondary metadata below each poster. Keep badges legible and limited to useful source-format information; they describe the file, not verified output capability.
+- **Details:** a full-width backdrop fading into the dark surface, with a poster, title or title artwork, a short metadata row, synopsis, and prominent lavender Play/Resume action. Put version, audio, and subtitle choices nearby when implemented. Keep raw paths and technical diagnostics out of the normal viewing flow.
+- **Remote focus:** combine a high-contrast outline with a modest card emphasis, without moving neighboring cards. Left from the first column enters navigation; Right returns to the remembered content item. Back returns to the previous screen and restores its selection. Set initial detail-page focus to Play/Resume. Avoid hover-only actions.
+- **Scope:** reproduce this visual language with a small set of screens. Recommendations, ratings, favorites, trailers, and administration are not prerequisites for the first usable client. Use placeholder artwork gracefully when a poster is unavailable.
 
 Before release, review licenses and attribution for reused fonts, icons, and artwork, and check Silo's branding guidance. Following the visual language does not require copying the web frontend or distributing reference screenshots.
 
