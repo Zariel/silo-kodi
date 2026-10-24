@@ -1,6 +1,6 @@
 # Select playback quality without losing position
 
-Status: the target plays a server-negotiated SDR H.264/AAC transcode through Kodi's native HLS player and the authenticated relay, including seeking after credential rotation. Quality replans are implemented and checked against the server; quality controls and player transition integration are not implemented. Production capabilities still advertise original HTTP only.
+Status: quality controls, replans, and native player transitions are implemented. The installed add-on passes original → 360p → Auto → 360p through the remote menu, including paused changes and subsequent resume. Capabilities advertise original HTTP and SDR H.264/AAC HLS. Combined subtitle/quality transitions, interruption cases, and broader media qualification remain unfinished.
 
 ## Requirement and ownership
 
@@ -44,7 +44,7 @@ Capture Kodi's actual position and pause state before requesting a quality chang
 
 Reopening Kodi is necessary when changing from an original file to HLS or back. Treat this as a transition inside the existing session owner. Old stop/end callbacks must not close the new delivery. Recheck actual player identity before applying position, subtitles, pause, progress, or cleanup. A video opened by another caller belongs to that caller.
 
-Kodi broadcasts player callbacks to all registered Python Player instances, and their signatures omit the file identity. Give each intended delivery transition a distinct local video URL and compare the observed current file against that expected URL. The same-core VideoPlayer reopen path emits Started and AVStarted without an intervening Stopped/Ended pair; a core replacement can emit Stopped. Do not require one fixed callback sequence. Keep a bounded pending transition until the expected URL reaches A/V readiness, and preserve the original plugin route on its ListItem for bookkeeping.
+Kodi broadcasts player callbacks to all registered Python Player instances, and their signatures omit the file identity. Give each intended delivery transition a distinct local video URL and compare the observed current file against that expected URL. The same-core VideoPlayer reopen path emits Started and AVStarted without an intervening Stopped/Ended pair; a core replacement can emit Stopped. Do not require one fixed callback sequence. Keep a bounded pending transition until the expected URL reaches A/V readiness, and preserve the original plugin route on a fresh ListItem for bookkeeping. Reusing Kodi's current item can retain the old dynamic path even after its ordinary path changes.
 
 After readiness, restore the plan's player position, wait for the observed clock to settle, apply the subtitle decision, and restore pause. Do not report startup zero as a new watch position. Only publish the completed UI selection after the player reaches the intended state. If the committed plan cannot be opened, report the failure and clean up the owned session rather than continuing with stale server identity.
 
@@ -52,15 +52,17 @@ After readiness, restore the plan's player position, wait for the observed clock
 
 A target API probe advertised experimental HLS support without changing installed capabilities. The server returned six fixed rungs for the selected SDR fixture. Selecting its 360p entry returned `server_transcode_hls`, a full timeline, and a finite authenticated media playlist. A separate temporary script opened a fresh 360p plan in Kodi's native player, sought to 90 seconds, observed clock advancement, then stopped and closed the session. No InputStream Adaptive configuration or device output settings changed.
 
-This establishes native-engine feasibility only. It does not establish the integrated quality menu, credential renewal across segments, pause restoration, continuous quality switching, natural expiry, or high-bitrate output.
+That initial probe established native-engine feasibility only; subsequent checks below cover integration separately.
 
-A subsequent target probe used the relay for the playlist and segments, paused, rotated the real access credential, sought to nine minutes, and observed advancing playback and media requests with fresh authority. Controlled-origin tests independently reject stale authority and verify query preservation, rewritten HEAD length, retired references, and late responses after a replan. Integrated quality transitions and natural expiry remain unqualified.
+A subsequent target probe used the relay for the playlist and segments, paused, rotated the real access credential, sought to nine minutes, and observed advancing playback and media requests with fresh authority. Controlled-origin tests independently reject stale authority and verify query preservation, rewritten HEAD length, retired references, and late responses after a replan. Natural expiry remains unqualified.
 
 The shared replan implementation has also been exercised against the server: original to 360p at 120 seconds, subtitle Off retaining 360p, and Auto returning to original at 125 seconds. The returned plans preserved the requested start positions, and the probe closed its session. This checks the negotiation contract without opening Kodi playback; it does not qualify player transitions. Focused tests cover unknown labels, stable retries, track preservation, quality persistence across subtitle changes, and rejection of an anchored HLS timeline while retaining the committed plan for cleanup.
 
 The probe also established a source-identity requirement. On every ListItem used to reopen playback, preserve the genuine originating plugin route in `original_listitem_url`. Kodi otherwise treats the temporary relay URL as a file when persisting watched state, a bookmark, and stream details. Each path can query the file modification date, producing three HTTP HEAD requests during shutdown. Plugin identities skip those modification-date lookups. The target's native stop completed in 0.28 seconds with the property preserved; relay and session cleanup then completed normally. Normal plugin resolution supplies this property, but a direct `Player.play` reopen must retain it explicitly.
 
-Acceptance must cover:
+The installed add-on's remote-menu acceptance selected 360p and independently observed Kodi's decoded height and preserved position. Returning to Auto restored the source resolution while paused. Selecting 360p again preserved pause and position, and resuming advanced the clock. Cleanup released playback authority and restored the screensaver. This does not yet qualify selected subtitles or audio identity across transitions, interruption during reopen, or all offered rungs.
+
+The full acceptance scope remains:
 
 1. Playlist/segment origin validation, query preservation, bounded parsing, unsupported references, stale generations, truncation, cancellation, and current authority through the loopback interface.
 2. Real original → lower quality → Auto transitions, including repeated choices, seeking in both directions, and independently observed Silo progress.

@@ -25,6 +25,9 @@ def capabilities():
                    'subtitles': {'embedded_text': True, 'sidecar_text': True,
                                  'ass_styling': False, 'embedded_bitmap': False,
                                  'sidecar_bitmap': False, 'font_attachments': False}}}}
+    context['deliveries']['hls'] = dict(context['deliveries']['original_http'],
+                                      containers=['hls'], video_codecs=['h264'],
+                                      audio_decode_codecs=['aac'], max_channels=2)
     return decoder, context
 
 

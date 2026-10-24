@@ -24,7 +24,7 @@ class PlaybackControls:
         self.window.clearProperty(_STATE)
         self.window.clearProperty(_REQUEST)
 
-    def publish(self, plan):
+    def publish(self, plan, quality='auto'):
         subtitle = plan.get('subtitle') or {}
         tracks = []
         for track in subtitle.get('inventory', []):
@@ -37,6 +37,8 @@ class PlaybackControls:
                            'supported': track.get('delivery') == 'sidecar'})
         # Publish only UI metadata, never stream URLs, headers, or credentials.
         self.state = {'revision': str(uuid.uuid4()), 'tracks': tracks,
+                      'qualities': [entry['label'] for entry in plan.get('available_qualities', [])],
+                      'quality': quality,
                       'selected': subtitle.get('track_id') if subtitle.get('mode') != 'off' else None}
         self.window.setProperty(_STATE, json.dumps(self.state))
 
@@ -45,10 +47,16 @@ class PlaybackControls:
         if not request:
             return None
         self.window.clearProperty(_REQUEST)
-        if request.get('revision') != self.state.get('revision') or 'subtitle' not in request:
+        if request.get('revision') != self.state.get('revision'):
             return None
-        track = request['subtitle']
-        if track is not None and not any(t['id'] == track and t['supported'] for t in self.state.get('tracks', [])):
+        if 'quality' in request and 'subtitle' not in request:
+            if request['quality'] not in ['auto'] + self.state.get('qualities', []):
+                return None
+        elif 'subtitle' in request and 'quality' not in request:
+            track = request['subtitle']
+            if track is not None and not any(t['id'] == track and t['supported'] for t in self.state.get('tracks', [])):
+                return None
+        else:
             return None
         self.window.setProperty(_STATE, json.dumps(dict(self.state, busy=True)))
         return request
@@ -68,25 +76,34 @@ def now_playing():
     if state.get('busy'):
         dialog.notification('Silo', 'Applying playback choice…')
         return
-    action = dialog.contextmenu(['Return to video', 'Subtitles'])
+    action = dialog.contextmenu(['Return to video', 'Subtitles', 'Quality'])
     if action == 0:
         xbmc.executebuiltin('ActivateWindow(fullscreenvideo)')
         return
-    if action != 1:
+    if action not in (1, 2):
         return
-    tracks = state.get('tracks', [])
-    labels = ['Off'] + [str(t['label']).replace('[', '(').replace(']', ')') +
-                        ('' if t['supported'] else ' · Unavailable') for t in tracks]
-    selected = next((i + 1 for i, t in enumerate(tracks) if t['id'] == state.get('selected')), 0)
-    choice = dialog.select('Subtitles', labels, preselect=selected)
-    if choice < 0:
-        return
-    if choice > 0 and not tracks[choice - 1]['supported']:
-        dialog.notification('Silo', 'This subtitle format is not supported yet.')
-        return
+    if action == 2:
+        qualities = ['auto'] + [q for q in state.get('qualities', []) if q != 'auto']
+        labels = ['Auto'] + [str(q).replace('[', '(').replace(']', ')') for q in qualities[1:]]
+        selected = qualities.index(state['quality']) if state.get('quality') in qualities else 0
+        choice = dialog.select('Quality', labels, preselect=selected)
+        if choice < 0:
+            return
+        request = {'quality': qualities[choice]}
+    else:
+        tracks = state.get('tracks', [])
+        labels = ['Off'] + [str(t['label']).replace('[', '(').replace(']', ')') +
+                            ('' if t['supported'] else ' · Unavailable') for t in tracks]
+        selected = next((i + 1 for i, t in enumerate(tracks) if t['id'] == state.get('selected')), 0)
+        choice = dialog.select('Subtitles', labels, preselect=selected)
+        if choice < 0:
+            return
+        if choice > 0 and not tracks[choice - 1]['supported']:
+            dialog.notification('Silo', 'This subtitle format is not supported yet.')
+            return
+        request = {'subtitle': tracks[choice - 1]['id'] if choice else None}
     current = _read(window, _STATE)
     if current.get('revision') != state.get('revision') or current.get('busy'):
-        dialog.notification('Silo', 'Playback changed. Open Subtitles again.')
+        dialog.notification('Silo', 'Playback changed. Open the menu again.')
         return
-    window.setProperty(_REQUEST, json.dumps({'revision': state['revision'],
-                                            'subtitle': tracks[choice - 1]['id'] if choice else None}))
+    window.setProperty(_REQUEST, json.dumps(dict(request, revision=state['revision'])))

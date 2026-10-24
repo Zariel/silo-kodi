@@ -107,6 +107,8 @@ python scripts/dev.py browse
 
 ## Qualify real Silo playback
 
+For quality acceptance, play a supported SDR video, seek away from the beginning, and choose **Now playing → Quality → 360p** when Silo offers it. Verify Kodi's decoded resolution and clock independently of the menu selection. Pause, select **Auto**, and verify the source resolution returns without losing pause or position. Repeat the lower-quality choice while paused, then resume and check clock advancement. Auto describes the preference; Silo can choose a lower delivered rung according to policy. Also test selected subtitles, seeks in both directions, external replacement, and stopping during a transition before qualifying broader use.
+
 For subtitle controls, start a video and return to the Silo browser. Choose **Now playing → Subtitles**, select a supported track, and verify Kodi's selected subtitle and visible cues. Seek, pause, choose **Off**, then choose the track again while paused. The clock must stay paused; after resuming, it must advance without restarting the video. Return to fullscreen through **Now playing → Return to video**. A track marked **Unavailable** must report its limitation without sending a replan. Close playback and confirm that the menu no longer offers the ended session.
 
 This is the acceptance procedure for the complete client, not a claim that the development build passes every step. Representative SDR movies and episodes play, and the UI resume and start-over choices reach their expected positions. Seeking recovery varies. Mid-playback media credential refresh, output qualification, and failure/replacement checks remain open. See the [compatibility status](playback-references.md) for measured results and limits.

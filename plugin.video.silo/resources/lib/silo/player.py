@@ -37,6 +37,21 @@ def _owns(player, url, source):
     return player.getPlayingFile().split('|', 1)[0] in (url.split('|', 1)[0], source)
 
 
+def _item(title, url, source, plan):
+    # Fresh items must not retain a previous plugin resolution's dynamic path.
+    item = xbmcgui.ListItem(label=title, path=url)
+    item.setContentLookup(False)
+    if source:
+        item.setProperty('original_listitem_url', source)
+    mime = plan['stream'].get('mime_type')
+    if mime:
+        item.setMimeType(mime)
+    start = plan['timeline'].get('player_start_seconds', 0)
+    if start > 0:
+        item.setProperty('StartOffset', str(start))
+    return item
+
+
 def play(handle, session, profile_id, file_id, title, start_position=None, source=None, subtitle_track_id=None):
     attempt = None
     relay = None
@@ -45,6 +60,9 @@ def play(handle, session, profile_id, file_id, title, start_position=None, sourc
     last_position = None
     paused = False
     duration = None
+    pending_url = None
+    restore_pause = None
+    pause_requested = False
     player = _Player()
     monitor = xbmc.Monitor()
     try:
@@ -53,35 +71,45 @@ def play(handle, session, profile_id, file_id, title, start_position=None, sourc
                 controls = PlaybackControls()
                 attempt = Attempt(session, profile_id, file_id, start_position, subtitle_track_id=subtitle_track_id)
                 attempt.start()
-                resources = {'video': attempt.plan['stream']}
+                video_name = 'video'
+                resources = {video_name: attempt.plan['stream']}
                 subtitle_name = None
                 if attempt.subtitle_url:
                     artifact = attempt.plan['subtitle']['artifact']
                     subtitle_name = 'subtitle.' + ('srt' if artifact['format'] == 'srt' else 'vtt')
                     resources[subtitle_name] = artifact
                 relay = MediaRelay(session, profile_id, resources)
-                url = relay.url('video')
+                url = relay.url(video_name)
                 xbmc.log('Silo: playback plan accepted', xbmc.LOGINFO)
-                item = xbmcgui.ListItem(label=title, path=url)
-                item.setContentLookup(False)
-                if source:
-                    # Kodi's bookmarks and file metadata belong to the plugin
-                    # route, not the temporary relay resource.
-                    item.setProperty('original_listitem_url', source)
-                mime = attempt.plan['stream'].get('mime_type')
-                if mime:
-                    item.setMimeType(mime)
                 start = attempt.plan['timeline'].get('player_start_seconds', 0)
-                if start > 0:
-                    item.setProperty('StartOffset', str(start))
-                xbmcplugin.setResolvedUrl(handle, True, item)
+                xbmcplugin.setResolvedUrl(handle, True, _item(title, url, source, attempt.plan))
                 resolved = True
                 deadline = time.monotonic() + 60
                 next_report = 0
                 resume_pending = start > 0
                 seek_deadline = None
                 tracks_applied = False
-                while not monitor.abortRequested() and not player.finished:
+                while not monitor.abortRequested():
+                    if pending_url is not None:
+                        # Core changes can emit an old stop callback. Commit only
+                        # after the new dynamic URL is observed with A/V ready.
+                        try:
+                            current = player.getPlayingFile().split('|', 1)[0] if player.isPlaying() else None
+                        except RuntimeError:
+                            current = None
+                        if current and current not in (url, pending_url, source):
+                            break
+                        if current == url and player.ready:
+                            pending_url = None
+                            player.finished = False
+                            player.completed = False
+                        elif time.monotonic() > deadline:
+                            raise Error('unsupported_playback')
+                        else:
+                            monitor.waitForAbort(.25)
+                            continue
+                    if player.finished:
+                        break
                     if not player.ready:
                         if time.monotonic() > deadline:
                             xbmc.log('Silo: player readiness timed out', xbmc.LOGWARNING)
@@ -110,24 +138,56 @@ def play(handle, session, profile_id, file_id, title, start_position=None, sourc
                         if resume_pending:
                             monitor.waitForAbort(.25)
                             continue
+                    if restore_pause is not None:
+                        if paused == restore_pause:
+                            restore_pause = None
+                        elif not pause_requested:
+                            player.pause()
+                            pause_requested = True
+                            deadline = time.monotonic() + 10
+                        elif time.monotonic() > deadline:
+                            raise Error('unsupported_playback')
+                        if restore_pause is not None:
+                            monitor.waitForAbort(.25)
+                            continue
                     last_position = position
                     request = controls.take()
                     if request is not None:
                         previous_file = attempt.plan.get('effective_media_file_id')
                         if not previous_file:
                             raise Error('unsupported_playback')
-                        attempt.select_subtitle(request['subtitle'], position)
+                        quality_change = 'quality' in request
+                        if quality_change:
+                            attempt.select_quality(request['quality'], position)
+                        else:
+                            attempt.select_subtitle(request['subtitle'], position)
                         if not _owns(player, url, source):
                             break
                         if attempt.plan.get('effective_media_file_id') != previous_file:
                             raise Error('unsupported_playback')
-                        resources = {'video': attempt.plan['stream']}
+                        if quality_change:
+                            video_name = 'video-' + attempt.plan_attempt_id
+                        resources = {video_name: attempt.plan['stream']}
                         if attempt.subtitle_url:
                             artifact = attempt.plan['subtitle']['artifact']
                             subtitle_name = 'subtitle-' + attempt.plan_attempt_id + ('.srt' if artifact['format'] == 'srt' else '.vtt')
                             resources[subtitle_name] = artifact
                         relay.update(resources)
                         tracks_applied = False
+                        if quality_change:
+                            pending_url = url
+                            url = relay.url(video_name)
+                            restore_pause = paused
+                            pause_requested = False
+                            player.ready = False
+                            player.finished = False
+                            player.completed = False
+                            start = attempt.plan['timeline'].get('player_start_seconds', 0)
+                            resume_pending = start > 0
+                            seek_deadline = None
+                            deadline = time.monotonic() + 60
+                            player.play(url, _item(title, url, source, attempt.plan))
+                            continue
                     if not tracks_applied:
                         if attempt.subtitle_url:
                             player.setSubtitles(relay.url(subtitle_name))
@@ -135,7 +195,7 @@ def play(handle, session, profile_id, file_id, title, start_position=None, sourc
                         else:
                             player.showSubtitles(False)
                         tracks_applied = True
-                        controls.publish(attempt.plan)
+                        controls.publish(attempt.plan, attempt.body['quality_preference'])
                     if time.monotonic() >= next_report:
                         try:
                             attempt.sample(last_position, paused)
@@ -145,7 +205,7 @@ def play(handle, session, profile_id, file_id, title, start_position=None, sourc
                             xbmc.log('Silo: progress temporarily unavailable', xbmc.LOGWARNING)
                         next_report = time.monotonic() + 10
                     monitor.waitForAbort(.25)
-                if player.completed and duration:
+                if player.completed and duration and pending_url is None:
                     last_position = duration
             finally:
                 if controls:
@@ -154,7 +214,8 @@ def play(handle, session, profile_id, file_id, title, start_position=None, sourc
                 # after resolution. A replacement belongs to its new caller.
                 if resolved:
                     try:
-                        if player.isPlaying() and _owns(player, url, source):
+                        if player.isPlaying() and (_owns(player, url, source)
+                                or (pending_url is not None and _owns(player, pending_url, source))):
                             player.stop()
                     except RuntimeError:
                         pass

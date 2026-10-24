@@ -39,6 +39,21 @@ class Controls(unittest.TestCase):
                 self.owner.publish(self.plan)
         self.assertNotIn('private', json.dumps(self.properties))
 
+    def test_quality_menu_keeps_auto_distinct_from_delivered_rung(self):
+        self.plan['available_qualities'] = [{'label': '360p'}, {'label': '720p-high'}]
+        self.plan['active_quality'] = '360p'
+        self.owner.publish(self.plan, 'auto')
+        self.dialog.contextmenu.return_value = 2
+        self.dialog.select.return_value = 2
+        self.module.now_playing()
+        self.dialog.select.assert_called_with('Quality', ['Auto', '360p', '720p-high'], preselect=0)
+        self.assertEqual(self.owner.take()['quality'], '720p-high')
+
+        self.owner.publish(self.plan, '720p-high')
+        self.dialog.select.return_value = 0
+        self.module.now_playing()
+        self.assertEqual(self.owner.take()['quality'], 'auto')
+
     def test_menu_opened_before_replacement_cannot_control_new_playback(self):
         def select(*args, **kwargs):
             self.owner.publish(self.plan)

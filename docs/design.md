@@ -1,6 +1,6 @@
 # Minimal Silo Kodi client
 
-Status: authentication, browsing, original-stream playback, and text subtitle controls are implemented and undergoing device acceptance. Full playback qualification, quality selection, and additional subtitle formats remain unfinished. This document describes the complete intended client, grounded in the Silo v2 contract.
+Status: authentication, browsing, original-stream playback, quality selection with SDR HLS transitions, and text subtitle controls are implemented and undergoing device acceptance. Full playback qualification, combined quality/subtitle workflows, and additional subtitle formats remain unfinished. This document describes the complete intended client, grounded in the Silo v2 contract.
 
 ## Requirement and boundaries
 
@@ -93,6 +93,8 @@ For a playable original plan, pin the returned stream URL and required media hea
 Kodi should select embedded audio/subtitle tracks from the unchanged container once server track identities can be mapped to Kodi's actual stream indexes. Do not invent index equivalence. The implemented subtitle path accepts server-selected SRT or WebVTT sidecars for original media, attaches current profile authority, and applies the sidecar after startup seeking settles. Both use the source clock; nonzero artifact timing origins are rejected until timeline mapping is implemented. An Off decision hides subtitles. The browser offers Now playing → Subtitles for server-provided sidecar tracks and Off. Native embedded selection, authored ASS/fonts, bitmap subtitles, and persistence of track choices remain to be implemented and qualified.
 
 ### Subtitle controls
+
+Quality uses the same revision-bound control channel. The owner negotiates a server-provided label, opens a distinct relay URL with a fresh Kodi ListItem, and restores position and pause before publishing the new selection. See the [quality playback design](quality-playback.md) for delivery limits and acceptance evidence.
 
 The playback owner publishes only subtitle labels, opaque track identities, selection, and a revision in Kodi Home-window properties. The browser uses a native selection dialog and submits a choice against that revision. The owner rejects stale requests and retains sole ownership of Silo mutations, observed position, and the relay. Cleanup removes both metadata and pending requests. No credentials or media URLs cross this UI channel.
 
