@@ -35,8 +35,10 @@ This is a validation matrix, not a release support guarantee. Deployment-specifi
 | Failed start | A missing-file request leaves Kodi idle and a subsequent valid video plays without a Kodi restart; post-resolution failures have focused cleanup regression tests |
 | Episode playback | Representative H.264 SDR episode with E-AC-3 advances for over 70 seconds |
 | Audio selection | Kodi controls retained; track changes and language/default mapping remain to be validated |
-| HDR10 and Dolby Vision/FEL | Not qualified; the initial decoder declaration is SDR only |
-| DTS-HD MA, TrueHD, Atmos | No end-to-end output qualification; decoder/stream labels do not prove AVR output |
+| HDR10 | A temporary original-stream probe played 2160p HEVC HDR10 with an advancing clock; device HDMI status reported HDR10/ST2084 at 2160p24. The installed add-on still declares SDR; capability integration, seeking, and broader output acceptance remain |
+| Dolby Vision/FEL | Not qualified. A native Profile 7 probe was refused by the server; the selected source has unknown enhancement-layer classification. Do not infer FEL from Profile 7 or an EL-present flag |
+| TrueHD/Atmos | During the HDR10 original-stream probe, Kodi reported active passthrough, device HDMI reported eight-channel MAT, and the receiver reported Atmos input. This is short-run receiver evidence, not sustained, seek-recovery, or audible speaker-output qualification |
+| DTS-HD MA | Candidate metadata identified; active receiver-format qualification remains |
 | Sustained bitrate | Short range reads measured; long playback across bitrate peaks remains |
 | Media credential rotation | Loopback media transport uses fresh authority on each read; real rotation during a 60-second pause followed by resume and seeking passes without changing playback identity. Natural-expiry acceptance remains |
 | Text subtitles | Authenticated WebVTT sidecar displays captions; repeated starts select it and retain selection after seeking. Loading and selection are asynchronous, so track count alone is insufficient evidence. SRT is not yet device-qualified |
