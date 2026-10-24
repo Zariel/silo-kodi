@@ -107,6 +107,8 @@ python scripts/dev.py browse
 
 ## Qualify real Silo playback
 
+For subtitle controls, start a video and return to the Silo browser. Choose **Now playing → Subtitles**, select a supported track, and verify Kodi's selected subtitle and visible cues. Seek, pause, choose **Off**, then choose the track again while paused. The clock must stay paused; after resuming, it must advance without restarting the video. Return to fullscreen through **Now playing → Return to video**. A track marked **Unavailable** must report its limitation without sending a replan. Close playback and confirm that the menu no longer offers the ended session.
+
 This is the acceptance procedure for the complete client, not a claim that the development build passes every step. Representative SDR movies and episodes play, and the UI resume and start-over choices reach their expected positions. Seeking recovery varies. Mid-playback media credential refresh, output qualification, and failure/replacement checks remain open. See the [compatibility status](playback-references.md) for measured results and limits.
 
 1. Approve device sign-in in your existing Silo browser session. Use two account profiles and a PIN-protected profile for authority tests. An admin API key is neither required nor a substitute for account sign-in.

@@ -11,7 +11,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'plugin.video.silo/
 
 class Lifetime(unittest.TestCase):
     def run_playback(self, scenario):
-        state = SimpleNamespace(file=None, closed=False, relay_closed=False, clock=0, player=None)
+        state = SimpleNamespace(file=None, closed=False, relay_closed=False, clock=0, player=None,
+                                subtitles=[], relay_updated=False)
         url = 'https://silo.example.test/api/v2/stream/owned'
 
         class Player:
@@ -34,6 +35,7 @@ class Lifetime(unittest.TestCase):
                 state.file = None
 
             def setSubtitles(self, path):
+                state.subtitles.append(path)
                 raise RuntimeError('Player rejected subtitle')
 
             def showSubtitles(self, enabled):
@@ -50,7 +52,7 @@ class Lifetime(unittest.TestCase):
 
         class Attempt:
             def __init__(self, *args, **kwargs):
-                self.plan = {'stream': {}, 'timeline': {'player_start_seconds': 0}}
+                self.plan = {'stream': {}, 'timeline': {'player_start_seconds': 0}, 'effective_media_file_id': 'file'}
                 self.plan['subtitle'] = {'artifact': {'format': 'vtt'}}
                 self.subtitle_url = '/subtitle.vtt' if scenario == 'subtitle_error' else None
 
@@ -59,6 +61,11 @@ class Lifetime(unittest.TestCase):
 
             def sample(self, *args):
                 pass
+
+            def select_subtitle(self, track, position):
+                state.file = 'https://other.example.test/replacement'
+                self.subtitle_url = '/subtitle.vtt'
+                self.plan_attempt_id = 'new-plan'
 
             def stop(self, *args):
                 state.closed = True
@@ -72,6 +79,9 @@ class Lifetime(unittest.TestCase):
 
             def close(self):
                 state.relay_closed = True
+
+            def update(self, resources):
+                state.relay_updated = True
 
         def resolve(handle, success, item):
             if success:
@@ -90,7 +100,9 @@ class Lifetime(unittest.TestCase):
         module = importlib.util.module_from_spec(spec)
         with patch.dict(sys.modules, modules):
             spec.loader.exec_module(module)
-            with patch.object(module, 'Attempt', Attempt), patch.object(module, 'MediaRelay', Relay), patch.object(module.time, 'monotonic', lambda: state.clock):
+            controls = Mock()
+            controls.take.return_value = {'subtitle': 'track'} if scenario == 'replan_replacement' else None
+            with patch.object(module, 'Attempt', Attempt), patch.object(module, 'MediaRelay', Relay), patch.object(module, 'PlaybackControls', return_value=controls), patch.object(module.time, 'monotonic', lambda: state.clock):
                 session = SimpleNamespace(store=SimpleNamespace(playback_lock=nullcontext))
                 module.play(1, session, 'profile', 'file', 'Title')
         return state
@@ -106,5 +118,13 @@ class Lifetime(unittest.TestCase):
     def test_cleanup_preserves_replacement(self):
         state = self.run_playback('replacement')
         self.assertEqual(state.file, 'https://other.example.test/replacement')
+        self.assertTrue(state.closed)
+        self.assertTrue(state.relay_closed)
+
+    def test_replacement_during_replan_does_not_receive_old_subtitles(self):
+        state = self.run_playback('replan_replacement')
+        self.assertEqual(state.file, 'https://other.example.test/replacement')
+        self.assertEqual(state.subtitles, [])
+        self.assertFalse(state.relay_updated)
         self.assertTrue(state.closed)
         self.assertTrue(state.relay_closed)

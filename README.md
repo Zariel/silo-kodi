@@ -2,7 +2,9 @@
 
 A browsing client for Silo, targeting Kodi 21 on CoreELEC. The intended client uses Silo account authentication and profiles, browses libraries on demand, and delegates media playback to Kodi without syncing the catalog into Kodi's library.
 
-**Status:** initial playback in validation. Version `0.3.0` provides QR sign-in, profile selection, library and detail screens, and original SDR video playback with Silo progress reporting. Representative movies, episodes, pause, resume, and start-over work on the test device. Seeking recovery, media credential renewal, and failure recovery need further qualification. HDR, lossless output qualification, quality selection, and subtitle controls remain unfinished.
+**Status:** playback in validation. Version `0.3.0` provides QR sign-in, profile selection, library and detail screens, original SDR video playback with Silo progress reporting, and text subtitle selection. Representative movies, episodes, pause, resume, start-over, and subtitle On/Off changes work on the test device. Natural token expiry, sustained bitrate, HDR, lossless output, quality selection, and additional subtitle formats still need implementation or qualification.
+
+During playback, return to Silo's browser and choose **Now playing → Subtitles** to select a server-provided text track or **Off**. **Now playing → Return to video** restores fullscreen playback. Kodi's normal controls remain available for pause, seek, and audio.
 
 - [Minimal client design](docs/design.md)
 - [Development and target test loop](docs/testing.md)

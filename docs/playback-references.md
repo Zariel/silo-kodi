@@ -40,4 +40,4 @@ This is a validation matrix, not a release support guarantee. Deployment-specifi
 | Sustained bitrate | Short range reads measured; long playback across bitrate peaks remains |
 | Media credential rotation | Loopback media transport uses fresh authority on each read; real rotation during a 60-second pause followed by resume and seeking passes without changing playback identity. Natural-expiry acceptance remains |
 | Text subtitles | Authenticated WebVTT sidecar displays captions; repeated starts select it and retain selection after seeking. Loading and selection are asynchronous, so track count alone is insufficient evidence. SRT is not yet device-qualified |
-| Quality and subtitle controls | Selection UI, quality replans, native embedded identity mapping, ASS/fonts, and bitmap paths remain |
+| Quality and subtitle controls | Browser subtitle menu passes On → seek → Off while paused → On; pause position is preserved and resume advances. Quality replans, native embedded identity mapping, ASS/fonts, and bitmap paths remain |

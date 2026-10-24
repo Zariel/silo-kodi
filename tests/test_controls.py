@@ -1,0 +1,67 @@
+import importlib.util
+import json
+from pathlib import Path
+import sys
+from types import SimpleNamespace
+import unittest
+from unittest.mock import Mock, patch
+
+
+class Controls(unittest.TestCase):
+    def setUp(self):
+        self.properties = {}
+        window = SimpleNamespace(getProperty=lambda k: self.properties.get(k, ''),
+                                 setProperty=self.properties.__setitem__,
+                                 clearProperty=lambda k: self.properties.pop(k, None))
+        self.dialog = Mock()
+        modules = {'xbmcgui': SimpleNamespace(Window=lambda _: window, Dialog=lambda: self.dialog),
+                   'xbmc': SimpleNamespace(Player=lambda: SimpleNamespace(isPlaying=lambda: True), executebuiltin=Mock())}
+        spec = importlib.util.spec_from_file_location('controls_test', Path(__file__).resolve().parents[1] /
+                                                     'plugin.video.silo/resources/lib/silo/controls.py')
+        self.module = importlib.util.module_from_spec(spec)
+        with patch.dict(sys.modules, modules):
+            spec.loader.exec_module(self.module)
+        self.owner = self.module.PlaybackControls()
+        self.plan = {'subtitle': {'mode': 'off', 'inventory': [
+            {'track_id': 'opaque-id', 'label': 'English', 'delivery': 'sidecar', 'url': 'private'},
+            {'track_id': 'bitmap', 'label': 'French', 'delivery': 'embedded'}]}}
+        self.owner.publish(self.plan)
+        self.dialog.contextmenu.return_value = 1
+
+    def test_menu_transmits_exact_identity_and_off(self):
+        for choice, expected in ((1, 'opaque-id'), (0, None)):
+            with self.subTest(choice=choice):
+                self.dialog.select.return_value = choice
+                self.module.now_playing()
+                request = self.owner.take()
+                self.assertEqual(request['subtitle'], expected)
+                self.assertIsNone(self.owner.take())
+                self.owner.publish(self.plan)
+        self.assertNotIn('private', json.dumps(self.properties))
+
+    def test_menu_opened_before_replacement_cannot_control_new_playback(self):
+        def select(*args, **kwargs):
+            self.owner.publish(self.plan)
+            return 1
+        self.dialog.select.side_effect = select
+        self.module.now_playing()
+        self.assertIsNone(self.owner.take())
+        self.dialog.notification.assert_called_once()
+
+    def test_queued_choice_cannot_cross_plan_revision(self):
+        self.dialog.select.return_value = 1
+        self.module.now_playing()
+        self.owner.publish(self.plan)
+        self.assertIsNone(self.owner.take())
+
+    def test_unsupported_choice_does_not_replan(self):
+        self.dialog.select.return_value = 2
+        self.module.now_playing()
+        self.assertIsNone(self.owner.take())
+        self.dialog.notification.assert_called_once()
+
+    def test_cleanup_removes_pending_choices_and_metadata(self):
+        self.dialog.select.return_value = 1
+        self.module.now_playing()
+        self.owner.close()
+        self.assertEqual(self.properties, {})

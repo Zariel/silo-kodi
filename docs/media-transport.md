@@ -34,7 +34,7 @@ Bound memory and concurrent transfers. Cancellation must close both sides of eac
 
 The existing final cleanup remains responsible for stopping only its owned Kodi playback and closing the Silo session. The relay does not report progress, choose another profile, or create replacement sessions.
 
-The relay can replace its resource map after a validated replan. Validate every resource before publishing the replacement; an invalid resource leaves the previous map intact. Keep the local video path stable so subsequent range requests use the replacement grant. Existing transfers finish against the resource they opened. Give each selected subtitle artifact a distinct local filename to avoid reusing Kodi's cached subtitle content, and remove retired subtitle resources. The playback owner must apply this operation; a UI must not change relay resources directly. This transport operation is implemented but not yet connected to the playback controls.
+The relay can replace its resource map after a validated replan. Validate every resource before publishing the replacement; an invalid resource leaves the previous map intact. Keep the local video path stable so subsequent range requests use the replacement grant. Existing transfers finish against the resource they opened. Give each selected subtitle artifact a distinct local filename to avoid reusing Kodi's cached subtitle content, and remove retired subtitle resources. The playback owner applies this operation for subtitle choices from the browser; the UI does not change relay resources directly.
 
 HLS manifests, segment authorization, and quality replans need a separate extension of this contract. Do not advertise those deliveries merely because original byte ranges work through the relay.
 

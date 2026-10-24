@@ -10,6 +10,7 @@ import xbmcgui
 import xbmcvfs
 
 from .catalog import Catalog, artwork
+from .controls import now_playing
 from .client import Error, Session
 from .ui import open_account, _text
 
@@ -81,6 +82,7 @@ class BrowserWindow(xbmcgui.WindowXML):
         menu.reset()
         for library in self.libraries:
             menu.addItem(xbmcgui.ListItem(_text(library['name'])))
+        menu.addItem(xbmcgui.ListItem('Now playing'))
         menu.addItem(xbmcgui.ListItem('Account'))
         menu.addItem(xbmcgui.ListItem('Close'))
         self.getControl(11).setLabel(_text(self.session.status()['profile']['name']))
@@ -256,6 +258,8 @@ class BrowserWindow(xbmcgui.WindowXML):
             if index < len(self.libraries):
                 self._task(lambda: self._library(self.libraries[index]))
             elif index == len(self.libraries):
+                self._task(now_playing)
+            elif index == len(self.libraries) + 1:
                 self.account_requested = True
                 self.close()
             else:

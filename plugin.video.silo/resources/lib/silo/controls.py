@@ -1,0 +1,92 @@
+"""Small Kodi window-property channel between browsing and the playback owner."""
+import json
+import uuid
+
+import xbmc
+import xbmcgui
+
+_STATE = 'silo.playback.state'
+_REQUEST = 'silo.playback.request'
+
+
+def _read(window, key):
+    try:
+        value = json.loads(window.getProperty(key))
+        return value if isinstance(value, dict) else {}
+    except (ValueError, TypeError):
+        return {}
+
+
+class PlaybackControls:
+    def __init__(self):
+        self.window = xbmcgui.Window(10000)
+        self.state = {}
+        self.window.clearProperty(_STATE)
+        self.window.clearProperty(_REQUEST)
+
+    def publish(self, plan):
+        subtitle = plan.get('subtitle') or {}
+        tracks = []
+        for track in subtitle.get('inventory', []):
+            label = str(track.get('label') or track.get('language') or 'Subtitle')
+            if track.get('forced'):
+                label += ' · Forced'
+            if track.get('hearing_impaired'):
+                label += ' · SDH'
+            tracks.append({'id': track['track_id'], 'label': label,
+                           'supported': track.get('delivery') == 'sidecar'})
+        # Publish only UI metadata, never stream URLs, headers, or credentials.
+        self.state = {'revision': str(uuid.uuid4()), 'tracks': tracks,
+                      'selected': subtitle.get('track_id') if subtitle.get('mode') != 'off' else None}
+        self.window.setProperty(_STATE, json.dumps(self.state))
+
+    def take(self):
+        request = _read(self.window, _REQUEST)
+        if not request:
+            return None
+        self.window.clearProperty(_REQUEST)
+        if request.get('revision') != self.state.get('revision') or 'subtitle' not in request:
+            return None
+        track = request['subtitle']
+        if track is not None and not any(t['id'] == track and t['supported'] for t in self.state.get('tracks', [])):
+            return None
+        self.window.setProperty(_STATE, json.dumps(dict(self.state, busy=True)))
+        return request
+
+    def close(self):
+        self.window.clearProperty(_STATE)
+        self.window.clearProperty(_REQUEST)
+
+
+def now_playing():
+    window = xbmcgui.Window(10000)
+    state = _read(window, _STATE)
+    dialog = xbmcgui.Dialog()
+    if not state or not xbmc.Player().isPlaying():
+        dialog.notification('Silo', 'No Silo video is playing.')
+        return
+    if state.get('busy'):
+        dialog.notification('Silo', 'Applying playback choice…')
+        return
+    action = dialog.contextmenu(['Return to video', 'Subtitles'])
+    if action == 0:
+        xbmc.executebuiltin('ActivateWindow(fullscreenvideo)')
+        return
+    if action != 1:
+        return
+    tracks = state.get('tracks', [])
+    labels = ['Off'] + [str(t['label']).replace('[', '(').replace(']', ')') +
+                        ('' if t['supported'] else ' · Unavailable') for t in tracks]
+    selected = next((i + 1 for i, t in enumerate(tracks) if t['id'] == state.get('selected')), 0)
+    choice = dialog.select('Subtitles', labels, preselect=selected)
+    if choice < 0:
+        return
+    if choice > 0 and not tracks[choice - 1]['supported']:
+        dialog.notification('Silo', 'This subtitle format is not supported yet.')
+        return
+    current = _read(window, _STATE)
+    if current.get('revision') != state.get('revision') or current.get('busy'):
+        dialog.notification('Silo', 'Playback changed. Open Subtitles again.')
+        return
+    window.setProperty(_REQUEST, json.dumps({'revision': state['revision'],
+                                            'subtitle': tracks[choice - 1]['id'] if choice else None}))

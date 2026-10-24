@@ -6,6 +6,7 @@ import xbmcgui
 import xbmcplugin
 
 from .client import Error
+from .controls import PlaybackControls
 from .playback import Attempt
 from .relay import MediaRelay
 
@@ -39,6 +40,7 @@ def _owns(player, url, source):
 def play(handle, session, profile_id, file_id, title, start_position=None, source=None, subtitle_track_id=None):
     attempt = None
     relay = None
+    controls = None
     resolved = False
     last_position = None
     paused = False
@@ -48,6 +50,7 @@ def play(handle, session, profile_id, file_id, title, start_position=None, sourc
     try:
         with session.store.playback_lock():
             try:
+                controls = PlaybackControls()
                 attempt = Attempt(session, profile_id, file_id, start_position, subtitle_track_id=subtitle_track_id)
                 attempt.start()
                 resources = {'video': attempt.plan['stream']}
@@ -103,6 +106,24 @@ def play(handle, session, profile_id, file_id, title, start_position=None, sourc
                         if resume_pending:
                             monitor.waitForAbort(.25)
                             continue
+                    last_position = position
+                    request = controls.take()
+                    if request is not None:
+                        previous_file = attempt.plan.get('effective_media_file_id')
+                        if not previous_file:
+                            raise Error('unsupported_playback')
+                        attempt.select_subtitle(request['subtitle'], position)
+                        if not _owns(player, url, source):
+                            break
+                        if attempt.plan.get('effective_media_file_id') != previous_file:
+                            raise Error('unsupported_playback')
+                        resources = {'video': attempt.plan['stream']}
+                        if attempt.subtitle_url:
+                            artifact = attempt.plan['subtitle']['artifact']
+                            subtitle_name = 'subtitle-' + attempt.plan_attempt_id + ('.srt' if artifact['format'] == 'srt' else '.vtt')
+                            resources[subtitle_name] = artifact
+                        relay.update(resources)
+                        tracks_applied = False
                     if not tracks_applied:
                         if attempt.subtitle_url:
                             player.setSubtitles(relay.url(subtitle_name))
@@ -110,7 +131,7 @@ def play(handle, session, profile_id, file_id, title, start_position=None, sourc
                         else:
                             player.showSubtitles(False)
                         tracks_applied = True
-                    last_position = position
+                        controls.publish(attempt.plan)
                     if time.monotonic() >= next_report:
                         try:
                             attempt.sample(last_position, paused)
@@ -123,6 +144,8 @@ def play(handle, session, profile_id, file_id, title, start_position=None, sourc
                 if player.completed and duration:
                     last_position = duration
             finally:
+                if controls:
+                    controls.close()
                 # Close the player before revoking its stream, including failures
                 # after resolution. A replacement belongs to its new caller.
                 if resolved:

@@ -1,6 +1,6 @@
 # Minimal Silo Kodi client
 
-Status: authentication, browsing, and initial original-stream playback are implemented and undergoing device acceptance. Full playback qualification, quality selection, and subtitles remain unfinished. This document describes the complete intended client, grounded in the Silo v2 contract.
+Status: authentication, browsing, original-stream playback, and text subtitle controls are implemented and undergoing device acceptance. Full playback qualification, quality selection, and additional subtitle formats remain unfinished. This document describes the complete intended client, grounded in the Silo v2 contract.
 
 ## Requirement and boundaries
 
@@ -90,7 +90,15 @@ A device capability assertion is a promise, not a wish list. Initially support o
 
 For a playable original plan, pin the returned stream URL and required media headers in the attempt's loopback relay, then pass its local URL to `xbmcplugin.setResolvedUrl`. Preserve signed URL parameters and attach current account and profile authority on every upstream request. Keep account credentials on the API origin; cross-origin delivery remains unsupported. The relay forwards original bytes and range metadata, while Kodi owns decoding and seeking. Do not require InputStream Adaptive for ordinary HTTP original files.
 
-Kodi should select embedded audio/subtitle tracks from the unchanged container once server track identities can be mapped to Kodi's actual stream indexes. Do not invent index equivalence. The implemented subtitle path accepts server-selected SRT or WebVTT sidecars for original media, attaches current profile authority, and applies the sidecar after startup seeking settles. Both use the source clock; nonzero artifact timing origins are rejected until timeline mapping is implemented. An Off decision hides subtitles. Native embedded selection, authored ASS/fonts, bitmap subtitles, the selection UI, and persistence of track choices remain to be implemented and qualified.
+Kodi should select embedded audio/subtitle tracks from the unchanged container once server track identities can be mapped to Kodi's actual stream indexes. Do not invent index equivalence. The implemented subtitle path accepts server-selected SRT or WebVTT sidecars for original media, attaches current profile authority, and applies the sidecar after startup seeking settles. Both use the source clock; nonzero artifact timing origins are rejected until timeline mapping is implemented. An Off decision hides subtitles. The browser offers Now playing → Subtitles for server-provided sidecar tracks and Off. Native embedded selection, authored ASS/fonts, bitmap subtitles, and persistence of track choices remain to be implemented and qualified.
+
+### Subtitle controls
+
+The playback owner publishes only subtitle labels, opaque track identities, selection, and a revision in Kodi Home-window properties. The browser uses a native selection dialog and submits a choice against that revision. The owner rejects stale requests and retains sole ownership of Silo mutations, observed position, and the relay. Cleanup removes both metadata and pending requests. No credentials or media URLs cross this UI channel.
+
+A track choice uses the active plan's inventory and a `track_change` replan. Off omits the subtitle identity; unchanged audio identity is preserved. Use a stable request ID and body for retries. Verify that the returned plan still uses the same original media file before updating relay grants and applying the text sidecar through Kodi. Do not seek or reopen the player for a subtitle-only change. Recheck ownership after the network operation so a replacement video cannot receive the old session's subtitle.
+
+Native Kodi subtitle selection cannot populate Silo-only artifacts or express Silo's track-change contract by itself. Giving the browsing window its own session would duplicate playback ownership. A separate permanent service is unnecessary while the existing invocation owns playback reliably. Keep this small UI channel scoped to that invocation; it is not a durable command queue.
 
 ### Session lifetime
 
