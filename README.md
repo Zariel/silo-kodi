@@ -1,8 +1,8 @@
 # Silo for Kodi
 
-A browsing client for Silo, targeting Kodi 21 on CoreELEC. The intended client uses Silo account authentication and profiles, browses libraries on demand, and delegates media playback to Kodi without syncing the catalog into Kodi's library.
+A browsing client for Silo, targeting Kodi 21 on CoreELEC. The client uses Silo account authentication and profiles, browses libraries on demand, and delegates media playback to Kodi without syncing the catalog into Kodi's library.
 
-**Status:** playback in validation. Version `0.3.0` provides QR sign-in, profile selection, Home, library and detail screens, native video playback with Silo progress reporting, quality selection, and text/embedded PGS subtitle selection. Representative movies, episodes, pause, resume, start-over, combined subtitle/quality changes, HDR10, and Dolby Vision with receiver-confirmed TrueHD/Atmos pass short checks on the test device. A ten-minute high-bitrate playback check passes sampled clock and buffering checks. Synthetic client-expiry checks verify real credential renewal during original and HLS playback. Broader bitrate/output coverage and additional subtitle formats remain unqualified.
+**Status:** initial release candidate validated on the test device. Version `0.3.0` provides QR sign-in, profile selection, Home, library and detail screens, native video playback with Silo progress reporting, quality selection, and text/embedded PGS subtitle selection. Representative movies, episodes, pause, resume, start-over, combined subtitle/quality changes, HDR10, and Dolby Vision with receiver-confirmed TrueHD/Atmos pass short checks on the test device. A ten-minute high-bitrate playback check passes sampled clock and buffering checks. Synthetic client-expiry checks verify real credential renewal during original and HLS playback. Broader bitrate/output coverage and additional subtitle formats remain unqualified.
 
 Original-file presentation is delegated to Kodi, with declared codec eligibility up to 2160p. HDR, Dolby Vision/FEL, and audio passthrough depend on the device, Kodi build, and configuration. See the compatibility evidence below; these are not universal Kodi support claims.
 
@@ -16,6 +16,7 @@ Choose **Now playing → Quality** for Silo's available qualities or **Auto**. C
 
 Audio selected through Kodi's controls is carried across quality and subtitle changes when the source track can be matched uniquely. A nondefault soundtrack passes an original → 360p → Auto check. Ambiguous track metadata can prevent a playback change; the add-on reports this instead of guessing a soundtrack.
 
+- [Release acceptance and known limits](docs/acceptance.md)
 - [Minimal client design](docs/design.md)
 - [Development and target test loop](docs/testing.md)
 - [Packaging and GitHub Releases](docs/releases.md)

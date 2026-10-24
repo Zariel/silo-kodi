@@ -20,9 +20,9 @@ PM4K also delays embedded-subtitle re-enabling until a resume seek settles, beca
 
 PM4K is a behavioral reference. Its implementation has not been vendored into this add-on.
 
-## Development compatibility status
+## Initial release compatibility status
 
-This is a validation matrix, not a release support guarantee. Deployment-specific evidence and fixture identities remain in ignored local testing storage.
+This matrix records the initial release’s measured compatibility. It is not a guarantee for every Kodi device or media file. Deployment-specific evidence and fixture identities remain in ignored local testing storage.
 
 | Requirement | Evidence or remaining work |
 | --- | --- |
@@ -44,3 +44,5 @@ This is a validation matrix, not a release support guarantee. Deployment-specifi
 | Text subtitles | Authenticated WebVTT sidecar displays captions; repeated starts select it and retain selection after seeking. Loading and selection are asynchronous, so track count alone is insufficient evidence. SRT is not yet device-qualified |
 | Quality controls | Remote menu passes original → 360p → Auto → 360p, preserving position and pause; Kodi's decoded resolution confirms delivery. A further SDR check passes all six choices offered for its source (720p-high/medium/low, 480p, 480p-low, and 360p), with decoded heights, paused positions, resume, forward/backward seeks, and return to Auto independently checked. Stopping during an observed busy quality transition clears owner state and leaves playback stopped through a subsequent three-second observation; the playback lock and screensaver checks pass. A separate replacement during busy quality negotiation retains the replacement stream identity and advancing clock after old-owner cleanup; its test grant is independently revoked afterward. Broader source and interruption coverage remain to qualify |
 | Combined subtitle and quality controls | Selected WebVTT cues visibly render at the same scene in original, 360p HLS, and returned Auto playback; Off removes the cue in HLS. HLS subtitle Off/On replans reopen the demuxer; forward/backward seeks and clock advancement pass afterward. Embedded MKV PGS cues also visibly render in original, server-burned 360p HLS, and returned Auto playback, with Off removing the same cue in both deliveries. Initial SDH selection and same-language SDH-to-English switching pass. This PGS fixture is SDR H.264; HDR combinations, ASS/fonts, and other bitmap formats remain unqualified |
+
+Transient control-plane failure is also checked on the target: three consecutive injected progress failures recover without replacing playback, and independent Silo reads verify saved progress and stream revocation. Simulated lost responses after real start/replan/stop commits replay identical requests and server decisions. These checks do not establish uninterrupted playback during an extended media-network outage.

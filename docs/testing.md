@@ -191,3 +191,9 @@ Both original playback and 360p HLS pass this synthetic-expiry check, followed b
 ## Real logout and restart persistence
 
 A separate development-readiness login was renewed through the real server and signed out using the production `Session.logout()` path. A fresh client instance observed cleared local authority, and the server rejected the revoked refresh token with HTTP 401. Session identities were checked before and after to prove that the installed add-on login was distinct and remained authenticated. The installed login also survived the recovery service restart, retained its selected profile, and authenticated afterward. These checks avoid signing the user out merely to repeat device approval.
+
+## Browser and control-plane recovery acceptance
+
+A temporary browser wrapper injects one catalog connection failure and removes artwork URLs from the next real page response. The installed window retains sidebar focus and a readable error; selecting the library again loads its cards. Missing artwork renders as rounded placeholder surfaces with readable titles, and details and return focus work. The wrapper closes its modal normally before removal; idle protection is observed afterward.
+
+Temporary playback wrappers import the installed player without modifying its code or server configuration. One injects three consecutive progress-request failures, exhausting the immediate retries. Playback continues, later reporting succeeds, and independent server watch-state and stopped-stream reads verify persistence and cleanup. Another drops successful start, replan, and stop replies after the real server commits them. It verifies that subsequent retries preserve the request body and receive the same session/plan identity or stop receipt. The paused quality transition and final cleanup pass. Both temporary add-ons are disabled and removed after testing, and playback ownership and idle protection are verified.
