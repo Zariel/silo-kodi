@@ -30,6 +30,10 @@ Provide a simple, remote-first experience that follows Silo's visual style. The 
 
 Use near-black surfaces, restrained borders, light text, rounded poster cards, and the configured Silo accent for primary actions and active navigation. Artwork, title information, and Play/Resume should dominate. Keep the accent sparse so posters carry most of the color. Use a conspicuous focus indicator, predictable directional navigation, and readable text at normal TV distance. Restore focus and scroll position after returning from details or playback. Loading and failure states must remain navigable with the remote.
 
+Library grids and expanded Home sections fetch cursor pages in the background when fewer than a server page plus a visible screen remain ahead of the selection. Append each response as a batch, deduplicate content IDs, and restore selection after Kodi rebinds the list. Keep paging owned by the open browser window; discard results after navigation, closing, or a profile change. Stop repeated cursors, continue through filtered empty pages, and preserve existing cards on errors. Reopening the page retries a failed request. Use Kodi's adjacent-row texture preloading for poster artwork.
+
+The sidebar shows icons while focus is in content and expands its labels when focus returns to navigation. Kodi focus conditions own this presentation; the client does not maintain a separate collapsed-menu state.
+
 Read the accent from `GET /api/v2/theme/branding` (`accent_color`), which the inspected server contract exposes before sign-in. Validate the color before converting it to Kodi color values, and use a neutral light primary action when the accent is absent, invalid, or unavailable. Keep text and the focus outline high-contrast regardless of the chosen accent. Scope cached branding to the server and clear it when the server changes. This does not require copying the web theme system or introducing a separate color preference.
 
 | Presentation approach | Tradeoff |

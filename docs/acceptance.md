@@ -1,6 +1,6 @@
 # Initial release acceptance
 
-Version `0.3.0` provides the planned browsing client for Kodi 21 on the tested CoreELEC setup. The installed package matches the reproducible local ZIP and the downloaded GitHub CI artifact. The supported workflows below have passed representative device checks, backed by 114 automated tests. The artifact is ready for local use and a GitHub prerelease; no release has been published as part of these checks.
+Version `0.3.0` provides the planned browsing client for Kodi 21 on the tested CoreELEC setup. The original acceptance package matched the reproducible local ZIP and the downloaded GitHub CI artifact; subsequent browsing changes are described below. The supported workflows below have passed representative device checks, backed by 119 automated tests. The artifact is ready for local use and a GitHub prerelease; no release has been published as part of these checks.
 
 All endpoints, fixture identities, account data, screenshots, and raw device results remain in ignored local testing storage. The [compatibility matrix](playback-references.md) records the scope of media/output evidence; [testing procedures](testing.md) describe reproduction and cleanup.
 
@@ -19,10 +19,16 @@ All endpoints, fixture identities, account data, screenshots, and raw device res
 
 - The package contains the add-on allowlist and required license notices, excluding test configuration, credentials, source snapshots, and generated Python caches.
 - Identical inputs produce identical ZIP bytes. The SHA-256 sidecar is verified, a matching release tag builds, and a mismatched tag leaves the existing artifact unchanged.
-- Independent hashes of installed files match the local ZIP and the successful [GitHub CI artifact](https://github.com/Zariel/silo-kodi/actions/runs/40118604371).
+- For the original acceptance build, independent hashes of installed files matched the local ZIP and the successful [GitHub CI artifact](https://github.com/Zariel/silo-kodi/actions/runs/40118604371).
 - Kodi's ZIP installer replaces the package without changing saved credentials. An isolated empty data directory opens manual server setup without inheriting an account.
 - Repository guidance and ignored scratch/testing directories are present. Known private deployment references were absent from the tracked tree and all 64 reachable revisions inspected before the final documentation changes.
 - The [GitHub Release procedure](releases.md) and release-triggered asset workflow are configured. CI artifact creation is verified; actual release publication and asset attachment remain the publisher's step.
+
+## Automatic paging and compact navigation follow-up
+
+Library and expanded Home grids preload cursor pages without a **Load more** card. The local suite covers overlap deduplication, filtered empty pages, repeated cursors, failure recovery, stale navigation results, and profile authority. A device check observed a library grow from 100 to 150 cards without a loading banner and retain the selected card through details and Back.
+
+The sidebar collapses to icons when content has focus and expands its labels when navigation regains focus. Captures verify both layouts, but some icons intermittently disappear after changing libraries. This remains unresolved. Expanded Home automatic paging, exact viewport placement during a background append, and final sidebar rendering still need device acceptance. Target interaction is paused at the user's request; later local changes have not been deployed or requalified against the GitHub artifact.
 
 ## Known limitations
 

@@ -70,9 +70,9 @@ Before sharing logs after authentication is implemented, redact signed stream UR
 
 ## Check browsing with the remote
 
-After signing in and choosing a profile, open Silo to show Home. Use the left navigation to change library or open **Account**. Moving right returns to the content selection. Choose a poster to open its details, a season to show episodes, and an episode to show its details. **Back** restores the preceding screen and selection.
+After signing in and choosing a profile, open Silo to show Home. Use the left navigation to change library or open **Account**. Moving right returns to the content selection and collapses the sidebar to icons. Moving left into the sidebar expands its labels; verify that both states retain recognizable icons and the selected destination. Choose a poster to open its details, a season to show episodes, and an episode to show its details. **Back** restores the preceding screen and selection.
 
-Scroll to **Load more** after the first 50 titles and select it. Verify that another page appears and focus remains at the first appended card. Open that card and go Back; the loaded page and selection must remain. Empty libraries and unavailable artwork must not prevent navigation. **Play** negotiates media with Silo; original-file presentation is delegated to Kodi with declared codec eligibility up to 2160p. Confirm actual HDR/audio output on the target instead of inferring it from source badges or a successful start.
+Scroll through a library with more than 100 titles. Verify that pages load automatically ahead of the selection, without a **Load more** card or a loading banner. Open a card beyond the first page and go Back; the loaded cards and selection must remain. During a paging outage, existing cards must remain usable and the error must explain how to retry by reopening the page. Empty libraries and unavailable artwork must not prevent navigation. **Play** negotiates media with Silo; original-file presentation is delegated to Kodi with declared codec eligibility up to 2160p. Confirm actual HDR/audio output on the target instead of inferring it from source badges or a successful start.
 
 Switch profiles through **Account** and return to browsing. The client must rebuild the library root for the selected profile rather than restore the previous profile's history. Screenshots and private catalog evidence belong in ignored local storage.
 
@@ -152,7 +152,7 @@ Store fixture identifiers and private measurements in `.scratch/`. Keep deployme
 
 Open the add-on after profile selection. Home must be the initial page, with visible row titles in the profile's server order and the configured accent. Move horizontally to a nonfirst card, open details, and return: the same content must regain focus even if refreshing the row changes its position. If that card disappears, focus must remain on a valid card. Move down beyond the second row and back up; empty rows must not trap navigation.
 
-Choose **View all**, open a title, then return through the section to Home. Verify focus returns to **View all**. In a section with more than 50 cards, use **Load more** and verify the server cursor supplies additional cards without resetting selection. Switch to a library and back to Home through the sidebar. Verify an empty Home leaves library navigation accessible.
+Choose **View all**, open a title, then return through the section to Home. Verify focus returns to **View all**. In a section with more than 50 cards, keep scrolling and verify the server cursor supplies additional cards automatically without resetting selection. Switch to a library and back to Home through the sidebar. Verify an empty Home leaves library navigation accessible.
 
 After playback, verify Continue Watching reflects the server's updated progress. Switch profiles and verify the previous profile's rows are not retained. Exercise unavailable layout support separately from authentication and network failures: only unsupported endpoints permit compatibility fallback. Keep screenshots brief and verify idle display protection after closing the browser.
 
