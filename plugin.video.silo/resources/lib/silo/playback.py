@@ -123,16 +123,29 @@ class Attempt:
         tracks.pop('subtitle', None)
         if track_id is not None:
             tracks['subtitle'] = {'id': track_id}
+        return self._replan('track_change', tracks, self.body['quality_preference'], position)
+
+    def select_quality(self, quality, position):
+        if self.ended or not self.plan or not self.session_id:
+            raise Error('unsupported_playback')
+        if quality != 'auto' and not any(
+                entry.get('label') == quality for entry in self.plan.get('available_qualities', [])):
+            raise Error('unsupported_playback')
+        return self._replan('quality_change', dict(self.plan.get('selected_tracks') or {}), quality, position)
+
+    def _replan(self, operation, tracks, quality, position):
         body = {key: self.body[key] for key in (
             'installation_id', 'protocol_version', 'playback_attempt_id', 'quality_preference',
             'client_features', 'client_capabilities', 'client_playback_context')}
-        # Track changes are new user intent, not failed-route recovery. Off is
-        # represented by omitting subtitle only for this operation.
-        body.update(operation='track_change', replan_request_id=str(uuid.uuid4()),
+        # Intent changes keep the previous recipe eligible. Omitting subtitle
+        # means Off only for track_change; quality_change preserves the tracks.
+        body.update(operation=operation, quality_preference=quality, replan_request_id=str(uuid.uuid4()),
                     failed_plan_id=self.plan['plan_id'], plan_attempt_id=self.plan_attempt_id,
                     plan_attempt_key=self.plan['plan_attempt_key'], attempted_plan_keys=[],
                     attempt_count=1, position_seconds=max(0, position), selected_tracks=tracks)
         result = self._mutation('POST', '/playback/' + quote(self.session_id, safe='') + '/replan', body)
+        # The server may have committed before local delivery validation fails.
+        self.body['quality_preference'] = quality
         return self._accept(result)
 
     def _accept(self, result):
@@ -142,9 +155,15 @@ class Attempt:
         if (result.get('outcome') != 'playable' or not self.session_id or not self.plan
                 or result.get('session_id') != self.session_id):
             raise Error('unsupported_playback')
-        if (self.plan.get('delivery') != 'original_http'
+        delivery = self.plan.get('delivery')
+        timeline = self.plan.get('timeline', {})
+        if (delivery not in ('original_http', 'server_transcode_hls')
                 or self.plan.get('stream', {}).get('header_refresh') not in ('none', None)
-                or not self.plan.get('timeline', {}).get('can_seek_anywhere')):
+                or not timeline.get('can_seek_anywhere')):
+            raise Error('unsupported_playback')
+        if delivery == 'server_transcode_hls' and (
+                self.plan.get('stream', {}).get('protocol') != 'hls'
+                or timeline.get('timeline_offset_seconds') != 0):
             raise Error('unsupported_playback')
         authority = self.session.media_headers(self.profile_id)
         self.subtitle_url = subtitle_url(self.session.server, self.plan.get('subtitle', {'mode': 'off'}), authority)

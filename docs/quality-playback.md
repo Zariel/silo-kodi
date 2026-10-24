@@ -1,6 +1,6 @@
 # Select playback quality without losing position
 
-Status: the target plays a server-negotiated SDR H.264/AAC transcode through Kodi's native HLS player and the authenticated relay, including seeking after credential rotation. Quality controls and player transition integration are not implemented. Production capabilities still advertise original HTTP only.
+Status: the target plays a server-negotiated SDR H.264/AAC transcode through Kodi's native HLS player and the authenticated relay, including seeking after credential rotation. Quality replans are implemented and checked against the server; quality controls and player transition integration are not implemented. Production capabilities still advertise original HTTP only.
 
 ## Requirement and ownership
 
@@ -55,6 +55,8 @@ A target API probe advertised experimental HLS support without changing installe
 This establishes native-engine feasibility only. It does not establish the integrated quality menu, credential renewal across segments, pause restoration, continuous quality switching, natural expiry, or high-bitrate output.
 
 A subsequent target probe used the relay for the playlist and segments, paused, rotated the real access credential, sought to nine minutes, and observed advancing playback and media requests with fresh authority. Controlled-origin tests independently reject stale authority and verify query preservation, rewritten HEAD length, retired references, and late responses after a replan. Integrated quality transitions and natural expiry remain unqualified.
+
+The shared replan implementation has also been exercised against the server: original to 360p at 120 seconds, subtitle Off retaining 360p, and Auto returning to original at 125 seconds. The returned plans preserved the requested start positions, and the probe closed its session. This checks the negotiation contract without opening Kodi playback; it does not qualify player transitions. Focused tests cover unknown labels, stable retries, track preservation, quality persistence across subtitle changes, and rejection of an anchored HLS timeline while retaining the committed plan for cleanup.
 
 The probe also established a source-identity requirement. On every ListItem used to reopen playback, preserve the genuine originating plugin route in `original_listitem_url`. Kodi otherwise treats the temporary relay URL as a file when persisting watched state, a bookmark, and stream details. Each path can query the file modification date, producing three HTTP HEAD requests during shutdown. Plugin identities skip those modification-date lookups. The target's native stop completed in 0.28 seconds with the property preserved; relay and session cleanup then completed normally. Normal plugin resolution supplies this property, but a direct `Player.play` reopen must retain it explicitly.
 

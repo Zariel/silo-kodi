@@ -23,6 +23,8 @@ class Server:
         self.delivery = 'original_http'
         self.subtitle = {'mode': 'off'}
         self.replans = 0
+        self.tracks = {'audio': {'id': 'audio-commentary', 'index': 2}}
+        self.timeline = {'can_seek_anywhere': True, 'player_start_seconds': 24, 'timeline_offset_seconds': 0}
 
     def request(self, method, path, body=None, expected_profile=None):
         if expected_profile != 'viewer':
@@ -35,18 +37,68 @@ class Server:
             return {'allowed': True, 'protocol_versions': [3], 'installation_id': 'server-install', 'features': ['fixed_media_file_v1']}
         if path.endswith('/replan'):
             self.replans += 1
+            self.tracks = body['selected_tracks']
             self.subtitle = dict(self.subtitle, mode='render' if 'subtitle' in body['selected_tracks'] else 'off')
         if path == '/playback/start' or path.endswith('/replan'):
             return {'outcome': 'playable', 'session_id': 'session-1', 'playback_plan': {
                 'plan_id': 'plan-' + str(self.replans), 'plan_attempt_key': 'original-recipe',
-                'selected_tracks': {'audio': {'id': 'audio-commentary', 'index': 2}},
-                'delivery': self.delivery, 'stream': {'url': '/api/v2/stream/session-1?st=grant', 'header_refresh': 'none'},
+                'selected_tracks': self.tracks,
+                'available_qualities': [{'label': 'original'}, {'label': '360p'}],
+                'delivery': self.delivery, 'stream': {'url': '/api/v2/stream/session-1?st=grant', 'header_refresh': 'none',
+                                                    'protocol': 'hls' if self.delivery == 'server_transcode_hls' else 'http'},
                 'subtitle': self.subtitle,
-                'timeline': {'can_seek_anywhere': True, 'player_start_seconds': 24}}}
+                'timeline': self.timeline}}
         return {'outcome': 'stopped' if method == 'DELETE' else 'applied'}
 
 
 class Playback(unittest.TestCase):
+    @patch('silo.playback.time.sleep')
+    def test_quality_replans_preserve_tracks_and_intent(self, sleep):
+        server = Server()
+        server.tracks['subtitle'] = {'id': 'sidecar'}
+        server.subtitle = {'mode': 'render', 'artifact': {
+            'url': '/sub.vtt', 'format': 'vtt', 'timing_origin_seconds': 0}}
+        attempt = Attempt(server, 'viewer', 'file-7')
+        attempt.start()
+        server.delivery = 'server_transcode_hls'
+        server.fail = '/playback/session-1/replan'
+        attempt.select_quality('360p', 120)
+        attempt.select_subtitle(None, 121)
+        server.delivery = 'original_http'
+        attempt.select_quality('auto', 125)
+
+        requests = [body for _, path, body in server.calls if path.endswith('/replan')]
+        self.assertEqual(requests[0], requests[1])
+        self.assertEqual([r['quality_preference'] for r in requests], ['360p', '360p', '360p', 'auto'])
+        self.assertEqual([r['position_seconds'] for r in requests], [120, 120, 121, 125])
+        self.assertEqual([r['failed_plan_id'] for r in requests], ['plan-0', 'plan-0', 'plan-1', 'plan-2'])
+        self.assertEqual(requests[0]['selected_tracks'], {
+            'audio': {'id': 'audio-commentary', 'index': 2}, 'subtitle': {'id': 'sidecar'}})
+        self.assertEqual(requests[-1]['selected_tracks'], {'audio': {'id': 'audio-commentary', 'index': 2}})
+        self.assertEqual(requests[-1]['operation'], 'quality_change')
+        self.assertEqual(attempt.body['quality_preference'], 'auto')
+
+    def test_unknown_quality_does_not_mutate_session(self):
+        server = Server()
+        attempt = Attempt(server, 'viewer', 'file-7')
+        attempt.start()
+        with self.assertRaises(Error):
+            attempt.select_quality('invented-rung', 12)
+        self.assertFalse(any(path.endswith('/replan') for _, path, _ in server.calls))
+
+    def test_anchored_hls_is_rejected_without_losing_committed_plan(self):
+        server = Server()
+        attempt = Attempt(server, 'viewer', 'file-7')
+        attempt.start()
+        server.delivery = 'server_transcode_hls'
+        server.timeline = dict(server.timeline, timeline_offset_seconds=90)
+        with self.assertRaises(Error):
+            attempt.select_quality('360p', 120)
+        self.assertEqual(attempt.plan['plan_id'], 'plan-1')
+        self.assertEqual(attempt.body['quality_preference'], '360p')
+        attempt.stop(120)
+        self.assertEqual(server.calls[-1][0:2], ('DELETE', '/playback/session-1'))
+
     @patch('silo.playback.time.sleep')
     def test_subtitle_replans_preserve_audio_position_and_retry_identity(self, sleep):
         server = Server()
