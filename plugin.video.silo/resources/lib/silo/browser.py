@@ -293,7 +293,8 @@ class BrowserWindow(xbmcgui.WindowXML):
         if xbmc.Player().isPlaying():
             raise Error('playback_active')
         data = self.page['data']
-        versions = [version for version in self.catalog.versions(data['content_id']) if not version.get('unreadable')]
+        watch = self.catalog.watch(data['content_id'])
+        versions = watch['versions']
         if not versions:
             raise Error('unsupported_playback')
         index = 0
@@ -302,10 +303,10 @@ class BrowserWindow(xbmcgui.WindowXML):
             index = xbmcgui.Dialog().select('Choose version', labels)
         if index < 0 or self.closed.is_set():
             return
-        watch = self.catalog.watch(data['content_id']).get('user_data') or {}
-        position = watch.get('position_seconds') or 0
+        progress = watch.get('user_data') or {}
+        position = progress.get('position_seconds') or 0
         restart = False
-        if position > 0 and not watch.get('played'):
+        if position > 0 and not progress.get('played'):
             if self.closed.is_set():
                 return
             seconds = int(position)

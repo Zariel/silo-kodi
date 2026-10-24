@@ -4,6 +4,7 @@ import sys
 from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock, patch
+from urllib.parse import parse_qs, urlsplit
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'plugin.video.silo/resources/lib'))
 
@@ -117,3 +118,42 @@ class HomeNavigation(unittest.TestCase):
         self.window.onAction(SimpleNamespace(getId=lambda: 10))
         self.assertEqual(self.window.getControl(230).getSelectedPosition(), 0)
         self.assertEqual(self.window.getFocusId(), 230)
+
+    def test_watch_choices_start_selected_version_with_resume_or_restart(self):
+        self.open_home()
+        self.window.onClick(230)
+        globals_ = self.window.onClick.__globals__
+        player = globals_['xbmc'].Player.return_value
+        player.isPlaying.return_value = False
+        dialog = Mock()
+        dialog.select.return_value = 1
+        self.catalog.watch.return_value = {
+            'versions': [{'file_id': 'first'}, {'file_id': 'chosen'}],
+            'user_data': {'position_seconds': 125, 'played': False},
+        }
+        # A second source of version choices would disagree with this snapshot.
+        self.catalog.versions.side_effect = AssertionError('Watch already contains playable versions')
+        for choice, restart in ((0, None), (1, ['true'])):
+            with self.subTest(choice=choice), patch.object(globals_['xbmcgui'], 'Dialog', return_value=dialog, create=True):
+                dialog.contextmenu.return_value = choice
+                self.window.onClick(300)
+                query = parse_qs(urlsplit(player.play.call_args.args[0]).query)
+                self.assertEqual(query['file'], ['chosen'])
+                self.assertEqual(query['content'], ['a'])
+                self.assertEqual(query['profile'], ['viewer'])
+                self.assertEqual(query.get('restart'), restart)
+                self.assertEqual(dialog.contextmenu.call_args.args[0], ['Resume from 0:02:05', 'Play from beginning'])
+
+    def test_cancel_watch_choice_does_not_start_playback(self):
+        self.open_home()
+        self.window.onClick(230)
+        globals_ = self.window.onClick.__globals__
+        player = globals_['xbmc'].Player.return_value
+        player.isPlaying.return_value = False
+        self.catalog.watch.return_value = {
+            'versions': [{'file_id': 'first'}], 'user_data': {'position_seconds': 125}}
+        dialog = Mock()
+        dialog.contextmenu.return_value = -1
+        with patch.object(globals_['xbmcgui'], 'Dialog', return_value=dialog, create=True):
+            self.window.onClick(300)
+        player.play.assert_not_called()
