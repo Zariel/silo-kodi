@@ -234,7 +234,7 @@ class AccountWindow(xbmcgui.WindowXML):
             profile = self.profiles[index]
             pin = None
             if profile['has_pin']:
-                pin = xbmcgui.Dialog().input('Profile PIN', type=xbmcgui.INPUT_NUMERIC, option=xbmcgui.ALPHANUM_HIDE_INPUT)
+                pin = xbmcgui.Dialog().input('Profile PIN', type=xbmcgui.INPUT_ALPHANUM, option=xbmcgui.ALPHANUM_HIDE_INPUT)
                 if not pin:
                     return
             def select():
