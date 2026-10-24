@@ -71,6 +71,73 @@ class Browsing(unittest.TestCase):
         self.assertEqual(catalog.home_page('custom/1', 'opaque/+'), {
             'items': [episode], 'next_cursor': 'next-token'})
 
+    def test_home_aggregate_fallback_refreshes_cards_without_guessing_section_ids(self):
+        session = Session()
+        session.responses['/home/layout'] = Error('http_error', 404)
+        session.responses['/home/sections/opaque-row/items'] = Error('http_error', 404)
+        session.responses['/home/sections'] = {'sections': [
+            {'id': 'opaque-row', 'title': 'Keep watching', 'items': []}]}
+        catalog = Catalog(session)
+        section = catalog.home()[0]
+        self.assertEqual(catalog.home_section(section['id'])['items'], [])
+
+        episode = {'content_id': 'episode-2', 'type': 'episode'}
+        session.responses['/home/sections'] = {'sections': [
+            {'id': 'opaque-row', 'title': 'Keep watching', 'items': [episode]}]}
+        self.assertEqual(catalog.home_section(section['id']), {
+            'id': 'opaque-row', 'title': 'Keep watching', 'items': [episode]})
+
+        session.responses['/home/sections'] = {'sections': []}
+        with self.assertRaises(Error) as raised:
+            catalog.home_section(section['id'])
+        self.assertEqual(raised.exception.code, 'home_section_unavailable')
+
+    def test_home_row_errors_do_not_fall_back_to_aggregate_data(self):
+        for status in (401, 403, 429, 500, 503, 0):
+            with self.subTest(status=status):
+                session = Session()
+                session.responses['/home/sections/row/items'] = Error('unavailable', status)
+                with self.assertRaises(Error):
+                    Catalog(session).home_section('row')
+                self.assertEqual(session.requests, ['/home/sections/row/items'])
+
+    def test_missing_home_endpoints_leave_library_reads_available(self):
+        session = Session()
+        session.responses['/home/layout'] = Error('http_error', 404)
+        session.responses['/home/sections'] = Error('http_error', 404)
+        session.responses['/profile/sections/settings?scope=home'] = Error('http_error', 404)
+        session.responses['/user/libraries'] = {'items': [{'id': 'films', 'type': 'movies'}]}
+        catalog = Catalog(session)
+        with self.assertRaises(Error) as raised:
+            catalog.home()
+        self.assertEqual(raised.exception.code, 'home_unavailable')
+        self.assertEqual(catalog.libraries(), [{'id': 'films', 'type': 'movies'}])
+
+    def test_home_settings_preserve_positions_and_hide_profile_hidden_rows(self):
+        session = Session()
+        session.responses['/home/layout'] = Error('http_error', 404)
+        session.responses['/home/sections'] = Error('http_error', 405)
+        session.responses['/profile/sections/settings?scope=home'] = {'items': [
+            {'id': 'later', 'position': 8, 'hidden': False},
+            {'id': 'hidden', 'position': 0, 'hidden': True},
+            {'id': 'first', 'position': 2, 'hidden': False}]}
+        self.assertEqual([row['id'] for row in Catalog(session).home()], ['first', 'later'])
+
+    def test_home_defaults_order_discovered_recipes_without_guessing_ids(self):
+        session = Session()
+        session.responses['/home/layout'] = Error('http_error', 404)
+        session.responses['/home/sections'] = Error('http_error', 404)
+        session.responses['/profile/sections/settings?scope=home'] = {'items': [
+            {'id': 'custom-a', 'section_type': 'custom_filter'},
+            {'id': 'tv', 'section_type': 'recently_added', 'config': {'media_scope': 'series'}},
+            {'id': 'top', 'section_type': 'critically_acclaimed'},
+            {'id': 'movies', 'section_type': 'recently_added', 'config': {'media_scope': 'movie'}},
+            {'id': 'continue', 'section_type': 'continue_watching'},
+            {'id': 'custom-b', 'section_type': 'future_recipe'},
+            {'id': 'trending', 'section_type': 'trending_discover'}]}
+        self.assertEqual([row['id'] for row in Catalog(session).home()],
+                         ['continue', 'trending', 'movies', 'tv', 'top', 'custom-a', 'custom-b'])
+
     def test_library_types(self):
         session = Session()
         session.responses['/user/libraries'] = {'items': [

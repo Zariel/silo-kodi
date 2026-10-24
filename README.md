@@ -8,7 +8,7 @@ Original-file presentation is delegated to Kodi, with declared codec eligibility
 
 Home opens after profile selection and shows server-ordered rows using your configured accent. Use **View all** to browse a section, or choose a library from the sidebar. Returning from details refreshes the visible rows and retains the selected card when it still exists.
 
-The [six-milestone delivery plan](docs/design.md#delivery-sequence-and-acceptance) includes making Silo Home the main page after playback quality and subtitles, using server-provided sections and ordering with a default-order compatibility fallback.
+The [six-milestone delivery plan](docs/design.md#delivery-sequence-and-acceptance) includes making Silo Home the main page after playback quality and subtitles, using server-provided sections and ordering, with aggregate Home and profile-section-settings fallbacks.
 
 During playback, return to Silo's browser and choose **Now playing → Subtitles** to select a supported text or embedded PGS track, or **Off**. PGS uses native rendering for original MKV playback and server burn-in for supported lower-quality HLS. Use this menu for subtitle changes; selections made directly in Kodi’s subtitle OSD are not yet reconciled with Silo on a replan. **Now playing → Return to video** restores fullscreen playback. Kodi's normal controls remain available for pause, seek, and audio.
 

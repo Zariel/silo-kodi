@@ -32,6 +32,8 @@ class Error(Exception):
             'rate_limited': 'Too many attempts. Try again in {} seconds.'.format(retry_after),
             'invalid_server': 'Enter an HTTPS server URL without credentials, a query, or a fragment.',
             'invalid_response': 'Silo returned an unsupported response.',
+            'home_unavailable': 'This server cannot load Home. Choose a library from the menu.',
+            'home_section_unavailable': 'This Home section is no longer available. Reopen Home to refresh.',
             'pairing_unavailable': 'This server does not offer device sign-in.',
             'state_unreadable': 'The saved Silo session could not be read.',
             'redirect_refused': 'Silo redirected the API request. Check the configured server URL.',

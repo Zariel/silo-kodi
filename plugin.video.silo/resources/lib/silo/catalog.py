@@ -4,6 +4,17 @@ from urllib.parse import quote, urlencode, urljoin, urlsplit
 from .client import Error
 
 
+def _home_order(row):
+    # Silo DefaultHomeSections recipe order; IDs remain server-owned.
+    recipes = ('continue_watching', 'trending_discover', 'recently_added',
+               'recommended_for_you', 'because_you_watched', 'returning_shows',
+               'critically_acclaimed', 'hidden_gems', 'seasonal_themed')
+    recipe = row.get('section_type')
+    rank = recipes.index(recipe) if recipe in recipes else len(recipes)
+    scope = (row.get('config') or {}).get('media_scope') if recipe == 'recently_added' else None
+    return rank, {'movie': 0, 'series': 1}.get(scope, 2)
+
+
 def artwork(server, value):
     if not isinstance(value, str) or not value or any(c in value for c in ('|', '\r', '\n')):
         return ''
@@ -36,18 +47,36 @@ class Catalog:
                 if item.get('type') in ('movies', 'series')]
 
     def home(self):
+        for path in ('/home/layout', '/home/sections'):
+            try:
+                # Empty layouts are authoritative, including profile-hidden rows.
+                return self._get(path)['sections']
+            except Error as exc:
+                if exc.status not in (404, 405, 501):
+                    raise
         try:
-            result = self._get('/home/layout')
+            settings = self._get('/profile/sections/settings', {'scope': 'home'})['items']
+        except Error as exc:
+            if exc.status in (404, 405, 501):
+                raise Error('home_unavailable') from None
+            raise
+        rows = [row for row in settings if not row.get('hidden')]
+        if all(type(row.get('position')) is int and row['position'] >= 0 for row in rows):
+            return sorted(rows, key=lambda row: row['position'])
+        return sorted(rows, key=_home_order)
+
+    def home_section(self, section_id):
+        try:
+            result = self._get('/home/sections/' + quote(str(section_id), safe='') + '/items')
         except Error as exc:
             if exc.status not in (404, 405, 501):
                 raise
-            result = self._get('/home/sections')
-        # Both endpoints return the profile's visible sections in display order.
-        # An empty layout is authoritative; do not replace it with default rows.
-        return result['sections']
-
-    def home_section(self, section_id):
-        result = self._get('/home/sections/' + quote(str(section_id), safe='') + '/items')
+            # The aggregate endpoint already carries cards. Read it afresh so
+            # returning from playback does not reuse stale profile progress.
+            result = next((row for row in self._get('/home/sections')['sections']
+                           if str(row['id']) == str(section_id)), None)
+            if result is None:
+                raise Error('home_section_unavailable') from None
         return dict(result, items=[item for item in result['items']
                                    if item.get('type') in ('movie', 'series', 'episode')])
 
