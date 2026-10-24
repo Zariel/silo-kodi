@@ -35,13 +35,13 @@ def png(width, height, pixels):
 
 def icon(segments, circles=()):
     pixels = bytearray()
-    for y in range(48):
+    for y in range(128):
         pixels.append(0)
-        for x in range(48):
+        for x in range(128):
             covered = 0
             for sy in range(4):
                 for sx in range(4):
-                    px, py = x + (sx + .5) / 4, y + (sy + .5) / 4
+                    px, py = (x + (sx + .5) / 4) * 48 / 128, (y + (sy + .5) / 4) * 48 / 128
                     hit = any(abs(((px-cx)**2 + (py-cy)**2)**.5 - radius) <= 1.5
                               for cx, cy, radius in circles)
                     for ax, ay, bx, by in segments:
@@ -50,11 +50,12 @@ def icon(segments, circles=()):
                         hit |= (px-ax-t*dx)**2 + (py-ay-t*dy)**2 <= 2.25
                     covered += hit
             pixels.extend((255, 255, 255, round(255 * covered / 16)))
-    return png(48, 48, pixels)
+    return png(128, 128, pixels)
 
 
 def navigation_icons():
     shapes = {
+        'search': ([(30,30,41,41)], [(21,21,13)]),
         'home': ([(7,22,24,7),(24,7,41,22),(12,19,12,40),(12,40,36,40),
                   (36,40,36,19),(20,40,20,28),(20,28,28,28),(28,28,28,40)], []),
         'movies': ([(8,10,40,10),(40,10,40,38),(40,38,8,38),(8,38,8,10),
@@ -73,5 +74,5 @@ if __name__ == '__main__':
     OUTPUT.mkdir(parents=True, exist_ok=True)
     navigation_icons()
     (OUTPUT / 'rounded.png').write_bytes(rounded(64, 64, 16))
-    for width, height in ((185, 250), (215, 310), (250, 140), (280, 420)):
+    for width, height in ((150, 225), (185, 250), (215, 310), (250, 140), (280, 420)):
         (OUTPUT / f'card-{width}x{height}.png').write_bytes(rounded(width, height, 12))

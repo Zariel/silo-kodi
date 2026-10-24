@@ -287,8 +287,66 @@ class HomeNavigation(unittest.TestCase):
 
     def test_menu_keeps_playback_choices_without_sidebar_entry(self):
         self.window._menu()
-        self.assertEqual([item.label for item in self.window.getControl(100).items], ['Home', 'Account', 'Close'])
+        self.assertEqual([item.label for item in self.window.getControl(100).items], ['Home', 'Search', 'Account', 'Close'])
         globals_ = self.window.onClick.__globals__
         globals_['active_playback'].return_value = {'content_id': 'movie'}
         self.window.onAction(SimpleNamespace(getId=lambda: 117))
         globals_['playback_options'].assert_called_once()
+
+
+    def test_search_uses_trimmed_text_and_preserves_return_focus(self):
+        self.library()
+        self.window.getControl(200).selectItem(7)
+        dialog = Mock()
+        dialog.input.return_value = '  a & b  '
+        self.catalog.search.return_value = {'items': [self.card('result')], 'next_cursor': 'opaque'}
+        globals_ = self.window.onClick.__globals__
+        with patch.object(globals_['xbmcgui'], 'Dialog', return_value=dialog, create=True):
+            self.window._search()
+        self.catalog.search.assert_called_once_with('a & b')
+        self.assertEqual(self.window.page['kind'], 'search')
+        self.catalog.search.return_value = {'items': [self.card('next')], 'next_cursor': None}
+        self.window._prefetch()
+        self.assertEqual([item.label for item in self.window.getControl(200).items], ['result', 'next'])
+        self.catalog.search.assert_called_with('a & b', 'opaque')
+        self.window._back()
+        self.assertEqual(self.window.getControl(200).position, 7)
+
+    def test_cancel_search_preserves_current_page(self):
+        self.library()
+        page = self.window.page
+        dialog = Mock()
+        dialog.input.return_value = ''
+        globals_ = self.window.onClick.__globals__
+        with patch.object(globals_['xbmcgui'], 'Dialog', return_value=dialog, create=True):
+            self.window._search()
+        self.assertIs(self.window.page, page)
+        self.catalog.search.assert_not_called()
+
+    def test_context_uses_fresh_personal_state_and_keeps_selection(self):
+        control = self.library()
+        control.selectItem(3)
+        self.catalog.item.side_effect = None
+        self.catalog.item.return_value = dict(self.card('3'), user_state={
+            'played': False, 'is_favorite': True, 'in_watchlist': False})
+        self.catalog.set_state.return_value = dict(self.card('3'), user_state={
+            'played': False, 'is_favorite': False, 'in_watchlist': False})
+        dialog = Mock()
+        dialog.contextmenu.return_value = 3
+        globals_ = self.window.onClick.__globals__
+        with patch.object(globals_['xbmcgui'], 'Dialog', return_value=dialog, create=True):
+            self.window.onAction(SimpleNamespace(getId=lambda: 117))
+        self.assertIn('Remove from favourites', dialog.contextmenu.call_args.args[0])
+        self.catalog.set_state.assert_called_once_with('3', 'is_favorite', False)
+        self.assertEqual(control.position, 3)
+        self.assertFalse(self.window.page['items'][3]['user_state']['is_favorite'])
+
+    def test_context_cancel_and_missing_state_do_not_mutate(self):
+        self.library()
+        dialog = Mock()
+        dialog.contextmenu.return_value = -1
+        globals_ = self.window.onClick.__globals__
+        with patch.object(globals_['xbmcgui'], 'Dialog', return_value=dialog, create=True):
+            self.window.onAction(SimpleNamespace(getId=lambda: 117))
+        self.assertEqual(dialog.contextmenu.call_args.args[0], ['Details', 'Play / Resume'])
+        self.catalog.set_state.assert_not_called()

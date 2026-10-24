@@ -92,6 +92,7 @@ class BrowserWindow(xbmcgui.WindowXML):
             menu.addItem(item)
 
         add('Home', 'home')
+        add('Search', 'search')
         for library in self.libraries:
             add(_text(library['name']), 'tv' if library.get('type') == 'series' else 'movies')
         add('Account', 'account')
@@ -180,6 +181,73 @@ class BrowserWindow(xbmcgui.WindowXML):
         self.history = []
         self._show(dict(data, kind='library', title=library['name'], library=library))
 
+    def _search(self):
+        previous = self.page.get('query', '') if self.page else ''
+        self.getControl(20).setLabel('')
+        query = xbmcgui.Dialog().input('Search Silo', defaultt=previous).strip()
+        if not query or self.closed.is_set():
+            return
+        data = self.catalog.search(query)
+        self._push(dict(data, kind='search', title='Search: ' + query, query=query))
+
+    def _selected(self):
+        if not self.page:
+            return None
+        focus = self.getFocusId()
+        if focus in (230, 231) and self.page['kind'] == 'home':
+            rows = self.page.get('visible', [])
+            slot = focus - 230
+            items = rows[slot][1]['items'] if slot < len(rows) else []
+        elif focus in (200, 210, 220):
+            items = self.page.get('items', [])
+        elif self.page['kind'] == 'item':
+            return self.page['data']
+        else:
+            return None
+        index = self.getControl(focus).getSelectedPosition()
+        return items[index] if 0 <= index < len(items) else None
+
+    def _context(self):
+        selected = self._selected()
+        playing = active_playback(self.catalog.profile_id)
+        if not selected or not selected.get('content_id'):
+            if playing:
+                playback_options()
+            return
+        data = self.catalog.item(selected['content_id'])
+        choices = [('Details', 'detail')]
+        if data['type'] in ('movie', 'episode'):
+            choices.append(('Play / Resume', 'play'))
+        state = data.get('user_state') or {}
+        for field, on, off in (('played', 'Mark watched', 'Mark unwatched'),
+                               ('is_favorite', 'Add to favourites', 'Remove from favourites'),
+                               ('in_watchlist', 'Add to watchlist', 'Remove from watchlist')):
+            if type(state.get(field)) is bool:
+                label = off if state[field] else on
+                if field == 'played' and data['type'] == 'series':
+                    label += ' (all episodes)'
+                choices.append((label, field))
+        if playing:
+            choices.append(('Playback options', 'playback'))
+        self.getControl(20).setLabel('')
+        choice = xbmcgui.Dialog().contextmenu([label for label, _ in choices])
+        if choice < 0 or self.closed.is_set():
+            return
+        action = choices[choice][1]
+        if action == 'playback':
+            playback_options()
+        elif action in ('detail', 'play'):
+            if self.page['kind'] != 'item' or self.page['data']['content_id'] != data['content_id']:
+                self._detail(data['content_id'])
+            if action == 'play':
+                self._play()
+        else:
+            fresh = self.catalog.set_state(data['content_id'], action, not state[action])
+            selected.update(fresh)
+            self._remember()
+            self._show(self.page)
+            xbmcgui.Dialog().notification('Silo', 'Updated', time=1500, sound=False)
+
     def _remember(self):
         if self.page:
             self.page['focus'] = self.getFocusId()
@@ -189,7 +257,7 @@ class BrowserWindow(xbmcgui.WindowXML):
                     self.page['positions'][row['id']] = (row['items'][position]['content_id']
                                                          if 0 <= position < len(row['items']) else '__all__')
                 return
-            control = {'library': 200, 'section': 200, 'item': 210, 'season': 220}[self.page['kind']]
+            control = {'library': 200, 'section': 200, 'search': 200, 'item': 210, 'season': 220}[self.page['kind']]
             self.page['selection'] = max(0, self.getControl(control).getSelectedPosition())
 
     def _push(self, page):
@@ -204,7 +272,16 @@ class BrowserWindow(xbmcgui.WindowXML):
         item = xbmcgui.ListItem(_text(label or data.get('title') or 'Untitled'))
         item.setArt({'poster': artwork(self.session.server, data.get(art_key))})
         item.setProperty('summary', _text(data.get('overview') or ''))
-        item.setProperty('meta', _text(data.get('year') or data.get('air_date') or ''))
+        meta = []
+        if data.get('type') == 'series':
+            meta.append('TV')
+        elif data.get('type') == 'episode':
+            season, episode = data.get('season_number'), data.get('episode_number')
+            meta.append('S{} E{}'.format(season, episode) if season is not None and episode is not None else 'Episode')
+        date = data.get('year') or data.get('air_date')
+        if date:
+            meta.append(str(date))
+        item.setProperty('meta', _text(' · '.join(meta)))
         return item
 
     def _show(self, page):
@@ -229,13 +306,13 @@ class BrowserWindow(xbmcgui.WindowXML):
         if kind == 'home':
             self._show_home(page)
             return
-        if kind in ('library', 'section'):
+        if kind in ('library', 'section', 'search'):
             control_id = 200
             control = self.getControl(control_id)
             for data in page['items']:
                 control.addItem(self._card(data))
             if not page['items'] and not page.get('next_cursor'):
-                self.getControl(21).setLabel('This library has no visible titles.')
+                self.getControl(21).setLabel('No matching titles.' if page['kind'] == 'search' else 'This library has no visible titles.')
         else:
             data = page['data']
             self.getControl(30).setImage(artwork(self.session.server, data.get('backdrop_url')))
@@ -243,6 +320,7 @@ class BrowserWindow(xbmcgui.WindowXML):
             metadata = [str(data[key]) for key in ('year', 'content_rating') if data.get(key)]
             if data.get('runtime'):
                 metadata.append('{} min'.format(data['runtime']))
+            metadata.extend(data.get('genres', [])[:3])
             self.getControl(21).setLabel(_text('  •  '.join(metadata)))
             self.getControl(22).setText(_text(data.get('overview') or ''))
             if kind == 'season':
@@ -307,17 +385,21 @@ class BrowserWindow(xbmcgui.WindowXML):
     def _prefetch(self):
         page = self.page
         if (self.busy or self.closed.is_set() or not page
-                or page['kind'] not in ('library', 'section')
+                or page['kind'] not in ('library', 'section', 'search')
                 or not page.get('next_cursor') or page.get('paging_failed')):
             return
         control = self.getControl(200)
         # Keep a full server page plus a screen ahead of the selection.
-        if len(page['items']) - max(0, control.getSelectedPosition()) > 62:
+        if len(page['items']) - max(0, control.getSelectedPosition()) > 74:
             return
         cursor = page['next_cursor']
         try:
-            data = (self.catalog.home_page(page['section'], cursor) if page['kind'] == 'section'
-                    else self.catalog.page(page['library']['id'], cursor))
+            if page['kind'] == 'section':
+                data = self.catalog.home_page(page['section'], cursor)
+            elif page['kind'] == 'search':
+                data = self.catalog.search(page['query'], cursor)
+            else:
+                data = self.catalog.page(page['library']['id'], cursor)
         except Exception:
             page['paging_failed'] = True
             with self.publish_lock:
@@ -352,7 +434,7 @@ class BrowserWindow(xbmcgui.WindowXML):
             next_cursor = data['next_cursor']
             page['next_cursor'] = next_cursor if next_cursor not in seen else None
             if not page['items'] and not page['next_cursor']:
-                self.getControl(21).setLabel('This library has no visible titles.')
+                self.getControl(21).setLabel('No matching titles.' if page['kind'] == 'search' else 'This library has no visible titles.')
             if page['items']:
                 self.getControl(100).controlRight(control)
 
@@ -425,9 +507,11 @@ class BrowserWindow(xbmcgui.WindowXML):
             index = self.getControl(100).getSelectedPosition()
             if index == 0:
                 self._task(self._home)
-            elif index <= len(self.libraries):
-                self._task(lambda: self._library(self.libraries[index - 1]))
-            elif index == len(self.libraries) + 1:
+            elif index == 1:
+                self._task(self._search)
+            elif index <= len(self.libraries) + 1:
+                self._task(lambda: self._library(self.libraries[index - 2]))
+            elif index == len(self.libraries) + 2:
                 self.account_requested = True
                 self.close()
             else:
@@ -463,8 +547,8 @@ class BrowserWindow(xbmcgui.WindowXML):
             self._task(self._play)
 
     def onAction(self, action):
-        if action.getId() == 117 and active_playback(self.catalog.profile_id):
-            self._task(playback_options)
+        if action.getId() == 117:
+            self._task(self._context)
             return
         if (not self.busy and self.page and self.page['kind'] == 'home'
                 and self.getFocusId() in (230, 231) and action.getId() in (3, 4)):
