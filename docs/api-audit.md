@@ -50,7 +50,7 @@ The API supplies resume, restart, progress persistence, selected quality, subtit
 | Native OSD subtitle choices | Silo's subtitle menu negotiates changes; direct Kodi OSD subtitle selection is not yet reconciled into subsequent replans or remembered preferences. |
 | Network adaptation | Bandwidth probe/results and device connection limits exist. Do not send guessed bandwidth, clear learned limits, or add a startup probe by default. Automatic adaptation remains outside initial scope. |
 | Playback control and events | HTTP progress/replan/stop already satisfy the owned playback loop. Control sockets support remote commands; adding an always-on service is not required for local remote-control playback. Route diagnostics explicitly prohibit automatic retry, unlike identity-bound playback mutations. |
-| Additional viewer actions | Search, collections, favorites/watchlist, watched toggles, ratings, recommendation feedback, skip markers, and trickplay are available. They are optional UX additions, not substitutes for the core contracts above. |
+| Additional viewer actions | Basic catalog search, favorites/watchlist membership, and watched toggles are implemented in the browser. Collections, ratings, recommendation feedback, skip markers, and trickplay remain optional follow-up work. |
 
 Capability documents describe support/configuration, not operational health. Do not use capability probes to hide authentication, throttling, or temporary server failures. Retrying is operation-specific: start/replan/progress/stop have identity or sequence contracts; PIN checks and one-time credential collection do not share generic mutation retries. API success does not prove decoder, HDMI, FEL, audio passthrough, or uninterrupted playback.
 
@@ -80,7 +80,7 @@ Counts are HTTP operations, so GET and HEAD are separate operations. Mixed viewe
 | `auth` | 24 | Refresh and logout; browser owns password, OAuth, signup, and account recovery. |
 | `autoscan` | 2 | Server scanning and source management excluded. |
 | `branding` | 4 | Read public branding; artwork upload/administration stays server-side. |
-| `catalog` | 27 | Browse, detail, seasons, episodes, versions; search/filter/people/extra surfaces deferred. |
+| `catalog` | 27 | Browse, detail, seasons, episodes, versions, and capability-aware title search; advanced filters/people/extra surfaces deferred. |
 | `collections` | 32 | Optional viewer collection browsing deferred; collection editing/import excluded. |
 | `compat` | 1 | Native v2 client; no compatibility-listener discovery. |
 | `device-login` | 8 | Capability, start, poll, cancel; approval and denial belong to the browser. |
@@ -88,7 +88,7 @@ Counts are HTTP operations, so GET and HEAD are separate operations. Mixed viewe
 | `diagnostics` | 6 | No automatic diagnostic upload; local acceptance evidence only. |
 | `downloads` | 25 | Offline/download management excluded; not a substitute for playback grants. |
 | `ebooks` | 11 | Outside video playback scope. |
-| `favorites` | 4 | Optional personal list controls deferred. |
+| `favorites` | 4 | Profile-bound title membership add/remove; list browsing deferred. |
 | `history` | 2 | Optional history browsing/removal deferred. |
 | `history-imports` | 8 | No external history import or Kodi library synchronization. |
 | `home` | 10 | Layout, aggregate, and section cards used; calendar and editors deferred. |
@@ -114,8 +114,8 @@ Counts are HTTP operations, so GET and HEAD are separate operations. Mixed viewe
 | `settings` | 16 | Effective hidden-library setting used; general editor, plugin settings and subtitle appearance deferred. |
 | `subtitles` | 22 | Session grants deliver subtitles; provider search, upload, translation and editing excluded. |
 | `system` | 16 | OpenAPI used for audit; manual URL entry, no server setup or discovery. |
-| `watch` | 4 | Composite watch read used; manual watched toggles and trickplay deferred. |
-| `watchlist` | 7 | Optional personal list controls deferred. |
+| `watch` | 4 | Composite watch read and manual watched toggles used; trickplay deferred. |
+| `watchlist` | 7 | Profile-bound title membership add/remove; list browsing deferred. |
 | `webhook-sync` | 10 | External-provider synchronization excluded. |
 ## Validation and remaining limits
 

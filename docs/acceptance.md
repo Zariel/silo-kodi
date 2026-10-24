@@ -1,6 +1,6 @@
 # Initial release acceptance
 
-Version `0.3.0` provides the planned browsing client for Kodi 21 on the tested CoreELEC setup. The original acceptance package matched the reproducible local ZIP and the downloaded GitHub CI artifact; subsequent browsing changes are described below. The supported workflows below have passed representative device checks, backed by 123 automated tests. The artifact is ready for local use and a GitHub prerelease; no release has been published as part of these checks.
+Version `0.3.0` provides the planned browsing client for Kodi 21 on the tested CoreELEC setup. The original acceptance package matched the reproducible local ZIP and the downloaded GitHub CI artifact; subsequent browsing changes are described below. The supported workflows below have passed representative device checks, backed by 130 automated tests. The artifact is ready for local use and a GitHub prerelease; no release has been published as part of these checks.
 
 All endpoints, fixture identities, account data, screenshots, and raw device results remain in ignored local testing storage. The [compatibility matrix](playback-references.md) records the scope of media/output evidence; [testing procedures](testing.md) describe reproduction and cleanup.
 
@@ -28,11 +28,19 @@ All endpoints, fixture identities, account data, screenshots, and raw device res
 
 Library and expanded Home grids preload cursor pages without a **Load more** card. The local suite covers overlap deduplication, filtered empty pages, repeated cursors, failure recovery, stale navigation results, and profile authority. A device check observed a library grow from 100 to 150 cards without a loading banner and retain the selected card through details and Back.
 
-The sidebar collapses to icons when content has focus and expands its labels when navigation regains focus. Captures verify both layouts, but some icons intermittently disappear after changing libraries. This remains unresolved. Expanded Home automatic paging, exact viewport placement during a background append, and final sidebar rendering still need device acceptance. Target checks resumed with the receiver showing another input. The browsing/navigation build is deployed; it has not been requalified against the original GitHub artifact.
+The sidebar collapses to icons when content has focus and expands its labels when navigation regains focus. The denser browsing follow-up below verifies the revised rail. Expanded Home automatic paging and exact viewport placement during a background append still need device acceptance. Target checks resumed with the receiver showing another input. The browsing/navigation build is deployed; it has not been requalified against the original GitHub artifact.
 
 ## Playback navigation follow-up
 
 The Now playing sidebar destination is removed. A short device check using the installed browser and a real episode verified Back from fullscreen to the originating collection, preservation of the selected title and player identity, opening Quality through the context menu, and Back returning to the same fullscreen player. The owned video stopped and the test window closed normally. Local tests cover navigation history, profile-bound playback metadata, menu access, and cleanup. This test ran with the receiver on another input and does not add HDMI or audible-output evidence.
+
+## Denser browsing, search, and title actions
+
+The library and search grid now shows eight columns and three rows on the 1080p design canvas. Kodi scales that canvas to the configured GUI resolution. Home retains two horizontal shelves; film and TV details use tighter text and action spacing. The sidebar expands over stationary content. Repeated Home/library focus transitions pass. Some captures show all rail icons, while others omit unchanged rail elements. Kodi’s GLES screenshot path renders dirty regions before reading the backbuffer, so these captures do not distinguish a screenshot artifact from an on-screen fault. Physical visual confirmation remains outstanding; no frame-time benchmark was performed. Physical 4K GUI rendering remains untested.
+
+The [official TV client review](tv-client-references.md) informed search and card actions. Device checks verify native keyboard search, title options, details/Back selection, TV/season/episode details, and search paging from 100 to 150 results without a Load more control. A favourite was toggled through the title menu, independently checked through the favourite endpoint, and restored to its original state. Watched and watchlist endpoint contracts are covered locally; real watch history was not changed. A physical remote hold still depends on its Kodi keymap; the context-menu action itself is verified.
+
+The local suite passes 130 tests. The installed package passed SHA-256 verification. Checks ran with the receiver on another input, with no playback started, and ended with idle display protection verified. These checks do not add HDMI-output evidence or requalify the original CI artifact.
 
 ## Known limitations
 

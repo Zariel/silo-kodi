@@ -10,9 +10,11 @@ Home opens after profile selection and shows server-ordered rows using your conf
 
 The [six-milestone delivery plan](docs/design.md#delivery-sequence-and-acceptance) includes making Silo Home the main page after playback quality and subtitles, using server-provided sections and ordering, with aggregate Home and profile-section-settings fallbacks.
 
-During playback, press **Back** to return to the originating collection with the playing title selected. Open the context menu (**C** on a keyboard) and choose **Subtitles** to select a supported text or embedded PGS track, or **Off**. PGS uses native rendering for original MKV playback and server burn-in for supported lower-quality HLS. Use this menu for subtitle changes; selections made directly in Kodi’s subtitle OSD are not yet reconciled with Silo on a replan. **Back** from that collection restores fullscreen playback. Kodi's normal controls remain available for pause, seek, and audio.
+Use **Search** to find movies, series, and episodes when supported by your server. Results keep loading as you scroll. Hold Select on a remote mapped to Kodi's context menu, press Menu, or use keyboard **C** for title details, Play/Resume, watched status, favourites, and watchlist options.
 
-Choose **context menu → Quality** for Silo's available qualities or **Auto**. Changing quality preserves position and pause while reopening the video. The initial transcoded path supports SDR H.264/AAC HLS; other delivery combinations remain unqualified.
+During playback, press **Back** to return to the originating collection with the playing title selected. Open the context menu (**C** on a keyboard) and choose **Playback options → Subtitles** to select a supported text or embedded PGS track, or **Off**. PGS uses native rendering for original MKV playback and server burn-in for supported lower-quality HLS. Use this menu for subtitle changes; selections made directly in Kodi’s subtitle OSD are not yet reconciled with Silo on a replan. **Back** from that collection restores fullscreen playback. Kodi's normal controls remain available for pause, seek, and audio.
+
+Choose **context menu → Playback options → Quality** for Silo's available qualities or **Auto**. Changing quality preserves position and pause while reopening the video. The initial transcoded path supports SDR H.264/AAC HLS; other delivery combinations remain unqualified.
 
 Audio selected through Kodi's controls is carried across quality and subtitle changes when the source track can be matched uniquely. A nondefault soundtrack passes an original → 360p → Auto check. Ambiguous track metadata can prevent a playback change; the add-on reports this instead of guessing a soundtrack.
 
