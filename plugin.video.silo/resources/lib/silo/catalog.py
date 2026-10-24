@@ -36,6 +36,7 @@ class Catalog:
         if not profile:
             raise Error('profile_required')
         self.profile_id = profile['id']
+        self._search_type = None
 
     def _get(self, path, query=None):
         if query:
@@ -104,6 +105,38 @@ class Catalog:
         # Keep the server cursor even if an unfamiliar card was omitted.
         return {'items': [item for item in result['items'] if item.get('type') in ('movie', 'series')],
                 'next_cursor': result.get('page', {}).get('next_cursor')}
+
+    def search(self, text, cursor=None):
+        if self._search_type is None:
+            try:
+                capabilities = self._get('/catalog/search/capabilities')
+            except Error as exc:
+                if exc.status not in (404, 405, 501):
+                    raise
+                capabilities = {}
+            self._search_type = 'video_with_episodes' if capabilities.get('video_with_episodes_scope') else 'video'
+        query = {'source': 'query', 'q': text, 'type': self._search_type,
+                 'limit': 50, 'skip_total': 'true'}
+        if cursor is not None:
+            query['cursor'] = cursor
+        result = self._get('/catalog', query)
+        return {'items': [item for item in result['items'] if item.get('type') in ('movie', 'series', 'episode')],
+                'next_cursor': result.get('page', {}).get('next_cursor')}
+
+    def set_state(self, content_id, field, enabled):
+        path, method = {
+            'played': ('watched', 'POST'),
+            'is_favorite': ('favorites', 'PUT'),
+            'in_watchlist': ('watchlist', 'PUT'),
+        }[field]
+        self.session.request(method if enabled else 'DELETE',
+                             '/' + path + '/' + quote(str(content_id), safe=''),
+                             expected_profile=self.profile_id)
+        # Re-read authoritative state before presenting the mutation as complete.
+        item = self.item(content_id)
+        if item.get('user_state', {}).get(field) is not enabled:
+            raise Error('invalid_response')
+        return item
 
     def item(self, content_id):
         return self._get('/catalog/items/' + quote(str(content_id), safe=''))

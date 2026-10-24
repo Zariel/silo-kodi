@@ -215,3 +215,47 @@ class Browsing(unittest.TestCase):
                       'https://[invalid/art'):
             with self.subTest(value=value):
                 self.assertEqual(artwork('https://silo.example.test', value), '')
+
+
+class SearchAndActions(unittest.TestCase):
+    def test_search_preserves_rank_cursor_and_supported_episode_scope(self):
+        session = Session()
+        session.responses['/catalog/search/capabilities'] = {'video_with_episodes_scope': True}
+        session.responses['/catalog?source=query&q=a+%26+b&type=video_with_episodes&limit=50&skip_total=true&cursor=opaque%2F%2B'] = {
+            'items': [{'content_id': 'episode', 'type': 'episode'}, {'content_id': 'movie', 'type': 'movie'}],
+            'page': {'next_cursor': 'next'}}
+        result = Catalog(session).search('a & b', 'opaque/+')
+        self.assertEqual([item['content_id'] for item in result['items']], ['episode', 'movie'])
+        self.assertEqual(result['next_cursor'], 'next')
+
+    def test_unsupported_search_capability_falls_back_without_hiding_auth_errors(self):
+        for status in (404, 401):
+            session = Session()
+            session.responses['/catalog/search/capabilities'] = Error('http_error', status)
+            session.responses['/catalog?source=query&q=title&type=video&limit=50&skip_total=true'] = {
+                'items': [], 'page': {}}
+            if status == 404:
+                self.assertEqual(Catalog(session).search('title'), {'items': [], 'next_cursor': None})
+            else:
+                with self.assertRaises(Error):
+                    Catalog(session).search('title')
+                self.assertEqual(len(session.requests), 1)
+
+    def test_personal_actions_are_profile_bound_and_confirmed_by_read(self):
+        from unittest.mock import Mock
+        for field, path, method in (('played', 'watched', 'POST'), ('is_favorite', 'favorites', 'PUT'),
+                                    ('in_watchlist', 'watchlist', 'PUT')):
+            for enabled in (True, False):
+                with self.subTest(field=field, enabled=enabled):
+                    session = Mock()
+                    session.status.return_value = {'profile': {'id': 'viewer'}}
+                    item = {'content_id': 'movie/id', 'user_state': {field: enabled}}
+                    session.request.side_effect = [None, item]
+                    self.assertEqual(Catalog(session).set_state('movie/id', field, enabled), item)
+                    session.request.assert_any_call(method if enabled else 'DELETE', '/' + path + '/movie%2Fid',
+                                                    expected_profile='viewer')
+                    session.request.assert_any_call('GET', '/catalog/items/movie%2Fid', expected_profile='viewer')
+
+        session.request.side_effect = [None, {'user_state': {'is_favorite': False}}]
+        with self.assertRaises(Error):
+            Catalog(session).set_state('movie/id', 'is_favorite', True)
