@@ -55,9 +55,9 @@ Before release, review licenses and attribution for reused fonts, icons, and art
 
 ## Authentication and profile authority
 
-1. Configure a server URL, with no packaged default. Require TLS verification. Validate scheme and origin; do not follow credential-bearing redirects to arbitrary origins.
+1. Enter a server URL manually, with no packaged default or network discovery. Require TLS verification. Validate scheme and origin; do not follow credential-bearing redirects to arbitrary origins.
 2. Read `GET /auth/device/capability`; start `POST /auth/device/start` with device name, platform, and `client_purpose: device_login`. This permits later profile switching; a temporary remote-playback handoff binds a single profile and is unsuitable.
-3. Display the returned browser verification URL and user code. Poll `/auth/device/poll` at the returned interval, honor `poll_after`, expiry changes and `Retry-After`, and cancel through `/auth/device/cancel` when dismissed. Browser sign-in handles the deployment's OIDC provider; no admin key or stored account password is needed.
+3. Encode the returned `verification_uri_complete` as a QR code using an established QR library, and also display the browser verification URL and user code as a fallback. Sign-in and approval happen in Silo; do not implement a username/password form in the add-on. Poll `/auth/device/poll` at the returned interval, honor `poll_after`, expiry changes and `Retry-After`, and cancel through `/auth/device/cancel` when dismissed. Browser sign-in handles the deployment's OIDC provider; no admin key or stored account password is needed.
 4. Save the access/refresh pair under Kodi's add-on profile directory with mode 0600, atomic replacement, and a stable installation device UUID. Never place credentials in plugin navigation URLs, settings exports, or logs. Kodi does not provide an encrypted secret vault here.
 5. List `GET /profiles` using account authority. For a PIN profile, call `POST /profiles/{id}/verify-pin` and send the resulting `X-Profile-Token` together with `X-Profile-Id`. Do not persist a PIN. Respect lockout responses without automatic PIN retries.
 6. Keep the selected profile distinct from account authentication. Disable Kodi directory disk caching for profile-dependent lists. Include profile identity in navigation context and reject stale entries after a switch; rebuild the library root.
@@ -110,12 +110,59 @@ Keep bitrate unbounded by arbitrary client defaults, while honoring server polic
 
 ## Delivery sequence and acceptance
 
-1. **UX and lifecycle spike:** confirm visual references and prototype a focused poster grid/detail flow. Validate remote navigation and player return; decide the lifetime owner for Silo heartbeats before expanding the UI.
-2. **Account access:** implement device pairing, token persistence/refresh/logout, and profile/PIN selection. Browser approval is the only user credential interaction. Restart retains sign-in; failures do not accidentally change profile authority.
-3. **First real playback:** browse enough authenticated catalog data to choose one SDR movie, negotiate original delivery, and play it through Kodi. Prove range seeks, pause beyond 45 seconds, progress heartbeats, stop, and resume observed in Silo. This is the first end-to-end usable milestone.
-4. **Complete everyday browsing:** paginate libraries, navigate seasons/episodes, show artwork and details, support versions, and restore navigation state. Verify old profile navigation cannot play under stale authority. Wire these screens to the proven playback path.
-5. **Media qualification and recovery:** validate HDR10, DV/FEL, lossless soundtrack passthrough, embedded subtitles, and sustained bitrate; exercise expired tokens, network interruption, immediate stop, and file replacement. Keep hardware-specific results local.
-6. **Public release:** verify a clean ZIP install and an upgrade preserving settings and sign-in, then publish a versioned asset through GitHub Releases. State the tested Kodi and API compatibility and playback limitations.
+Deliver these five milestones in order. Each milestone must have a reproducible local acceptance check and small logical commits. UI work starts with the login screen and grows with browsing; a separate full browsing prototype is not a prerequisite for authentication.
+
+### 1. Authentication
+
+- Manual server URL entry; no network discovery or automatic server selection.
+- QR-based Silo device pairing, with a readable URL and user code fallback. The person signs in and approves through Silo's browser UI; the add-on never collects the account password.
+- Pending, approved, denied, canceled, expired, and network-error states. Respect polling intervals and rate limits. Allow a fresh attempt after expiry.
+- Persist and refresh login credentials, sign out, and handle revoked sessions without refresh loops. Select an account profile and verify its PIN when needed. Clear origin-bound state on a server change.
+- Read server branding without blocking authentication if it is unavailable.
+- **Acceptance:** approve a real pairing, select a profile, restart Kodi and remain signed in, then sign out. Exercise canceled/expired pairing and invalid profile PIN without changing the selected authority.
+
+#### Local authentication testing
+
+Provide a developer harness mode that runs the same pairing flow on the target and makes the QR image and verification link accessible from the workstation, so approval does not require a powered TV. The user still approves through Silo. Keep pairing artifacts, server/target configuration, and diagnostics in ignored `.local-testing/`; leave tokens in protected local credential storage, never the ZIP or tracked fixtures. Do not add a production authentication bypass or require an admin API key.
+
+Keep live integration checks separate from deterministic tests using synthetic responses. The latter cover expiry, cancellation, failed refresh, and polling delays without repeatedly consuming real sign-in requests. Exercise production UI separately on Kodi; a successful headless flow alone does not prove remote navigation or QR legibility. Normal development redeployment must preserve sign-in; any reset must be explicit and limited to the test state.
+
+### 2. Media browsing and screens
+
+- Render viewer libraries, paginated movie/series grids, title details, season posters, and episode cards following the visual direction above.
+- Provide clear loading, empty, access-denied, and retry states. Keep remote navigation responsive and restore focus/scroll position when returning.
+- Support profile switching, rebuilding profile-dependent screens and rejecting stale navigation. Load artwork without creating a local catalog mirror.
+- **Acceptance:** browse multiple pages and seasons using only the remote, open details, go Back, and switch profiles without leaking the previous profile's catalog. Include missing artwork and an unavailable server.
+
+### 3. Basic media playback
+
+- Resolve a selected movie or episode through Silo's playback negotiation and hand an original HTTP plan to Kodi. Keep this milestone focused on representative SDR media with its soundtrack.
+- Establish the session owner now: start/retry identity, progress heartbeats, current pause state, stop/completion/error cleanup, and immutable profile context. These are required protocol behavior, not optional polish for milestone 4.
+- Keep native Kodi controls available. Do not build a custom playback OSD or intentionally disable controls that Kodi already supplies. Explicit UX and full behavior validation follow in milestone 4.
+- Fail clearly on an unsupported delivery plan instead of silently degrading or bypassing Silo authorization.
+- **Acceptance:** select a real movie and an episode from the UI, play beyond the session-idle window, stop or finish, return to the correct screen, and verify Silo records and closes the correct session. Exercise a failed start and replacement by another item.
+
+### 4. Full playback behavior and media qualification
+
+- Validate pause/resume, a long pause, forward/backward seeks, and recovery after ordinary interruptions.
+- Offer Resume and Play from beginning using server watch state and protocol start positions. Silo's inspected protocol documents saved resume as the default and explicit `start_position: 0` as start over; verify these semantics through an independent Silo client. Do not maintain a separate resume database.
+- Validate HDR10, Dolby Vision including FEL reconstruction, DTS-HD MA, TrueHD/Atmos, audio track switching, and representative sustained high bitrates. Separate source-format labels from observed HDMI output, and keep device-specific evidence local.
+- **Acceptance:** the selected resume/restart action yields the expected player position; stop and reopen retain Silo's progress; another profile has independent progress. Confirm actual display/AVR output and decode behavior for each claimed format.
+
+### 5. Playback quality and subtitles
+
+- Discover server-provided quality choices and offer a small quality selector. Keep source-version selection distinct from quality adaptation.
+- Implement supported delivery/replan paths needed for those choices, preserving position and session semantics. Do not assume progressive remux offers arbitrary seeking or that quality adaptation preserves Dolby Vision/FEL.
+- Add explicit subtitle choices, Off, language/forced/default behavior, and external subtitle delivery where supported. Embedded tracks Kodi already exposes may work earlier; this milestone owns the complete selection behavior. Validate text and bitmap subtitles and any server-required burn-in path before claiming them.
+- **Acceptance:** change quality and subtitles on representative files, verify the actual resulting stream and position, and handle unavailable choices without a silent downgrade or playback loop.
+
+### Cross-cutting work and future work
+
+Add focused tests and target smoke checks alongside each milestone. Keep packaging usable throughout, and validate clean install, upgrade preserving credentials, and sanitized diagnostics before a public release. GitHub prereleases may deliver completed milestones; release automation is not a prerequisite for local iteration.
+
+Use the Silo Apple and Android clients as references for API flows, playback semantics, and user expectations. The server contract remains authoritative, and Kodi owns platform decoding/output. Do not infer Kodi codec support from a mobile client's capability declaration or copy its entire feature set.
+
+When a requested behavior is absent from the deployed Silo API, stop at a clear unsupported state and record future work with the missing contract, evidence, and an existing upstream issue link if one can be verified. Search upstream issues when the gap is established; do not invent an issue or open one automatically. Do not add a parallel local implementation of server-owned progress or state. Resume is documented upstream and is therefore a validation task, not an assumed missing feature.
 
 ## Development and distribution
 
@@ -136,3 +183,5 @@ Focused tests should distinguish these plausible failures: paging stops at 50 it
 
 - [Silo public UI showcase](https://siloserver.org/) and [Midnight Cinema theme](https://github.com/Silo-Server/silo-server/blob/489fe4d55735f3855b2a0d6276e57d148891b456/web/src/app.css).
 - [Kodi XML windows](https://xbmc.github.io/docs.kodi.tv/master/kodi-base/dd/d4d/group__python__xbmcgui__window__xml.html) and [GitHub Releases](https://docs.github.com/en/repositories/releasing-projects-on-github/about-releases).
+
+- Reference clients: [Silo Apple](https://github.com/Silo-Server/silo-apple) and [Silo Android](https://github.com/Silo-Server/silo-android).
