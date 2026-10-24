@@ -35,6 +35,8 @@ class Error(Exception):
             'pairing_unavailable': 'This server does not offer device sign-in.',
             'state_unreadable': 'The saved Silo session could not be read.',
             'redirect_refused': 'Silo redirected the API request. Check the configured server URL.',
+            'playback_active': 'Stop playback before changing the account, profile, or server.',
+            'unsupported_playback': 'Silo could not provide a supported original stream for this file.',
         }
         # Never display arbitrary response bodies or URLs containing credentials.
         super().__init__(messages.get(code, 'Silo refused the request (HTTP {}).'.format(status)))
@@ -113,6 +115,18 @@ class _Store:
         self.path = self.directory / 'session.json'
 
     @contextmanager
+    def playback_lock(self):
+        fd = os.open(self.directory / 'playback.lock', os.O_CREAT | os.O_RDWR, 0o600)
+        with os.fdopen(fd, 'a') as lock:
+            try:
+                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                raise Error('playback_active') from None
+            # Acquire before the credential lock. Hold through final stop so no
+            # account mutation can change the authority of a live session.
+            yield
+
+    @contextmanager
     def locked(self, rebind=False):
         fd = os.open(self.directory / 'session.lock', os.O_CREAT | os.O_RDWR, 0o600)
         with os.fdopen(fd, 'a') as lock:
@@ -176,7 +190,7 @@ class Session:
     @classmethod
     def configure(cls, server, directory, transport=None):
         session = cls(server, directory, transport)
-        with session.store.locked(rebind=True):
+        with session.store.playback_lock(), session.store.locked(rebind=True):
             pass
         return session
 
@@ -216,13 +230,23 @@ class Session:
         state['expires_at'] = expiry
         self.store.save(state)
 
-    def _request(self, state, method, path, body=None, profile=False, retry=True):
+    def _authorize(self, state, profile):
         if not state.get('tokens'):
             raise Error('sign_in_required')
         if state.get('expires_at', 0) <= time.time() + 30:
             self._refresh(state)
+        return self._headers(state, profile)
+
+    def media_headers(self, profile_id):
+        with self.store.locked() as state:
+            if state.get('profile', {}).get('id') != profile_id:
+                raise Error('profile_changed')
+            return self._authorize(state, True)
+
+    def _request(self, state, method, path, body=None, profile=False, retry=True):
+        headers = self._authorize(state, profile)
         try:
-            return self.http.request(method, path, body, self._headers(state, profile))
+            return self.http.request(method, path, body, headers)
         except Error as exc:
             if exc.status != 401 or not retry:
                 raise
@@ -239,7 +263,7 @@ class Session:
         return self.request('GET', '/profiles', profile=False)['items']
 
     def select_profile(self, profile_id, pin=None):
-        with self.store.locked() as state:
+        with self.store.playback_lock(), self.store.locked() as state:
             profiles = self._request(state, 'GET', '/profiles')['items']
             profile = next((p for p in profiles if str(p['id']) == str(profile_id)), None)
             if profile is None:
@@ -259,7 +283,7 @@ class Session:
             return {'id': str(profile['id']), 'name': profile['name']}
 
     def logout(self):
-        with self.store.locked() as state:
+        with self.store.playback_lock(), self.store.locked() as state:
             revoked = True
             try:
                 if state.get('tokens'):

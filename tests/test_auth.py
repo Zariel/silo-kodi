@@ -56,6 +56,31 @@ class Server:
 
 
 class Authentication(unittest.TestCase):
+    def test_media_authority_refreshes_and_rejects_stale_profiles(self):
+        self.approve()
+        self.session.select_profile('open')
+        with patch('silo.client.time.time', return_value=time.time() + 7200):
+            headers = self.session.media_headers('open')
+        self.assertEqual(headers['Authorization'], 'Bearer access-2')
+        self.assertEqual(headers['X-Profile-Id'], 'open')
+        with self.assertRaises(Error) as raised:
+            self.session.media_headers('another')
+        self.assertEqual(raised.exception.code, 'profile_changed')
+
+    def test_playback_prevents_authority_changes_until_cleanup(self):
+        self.approve()
+        self.session.select_profile('open')
+        with self.session.store.playback_lock():
+            self.assertEqual(self.session.request('GET', '/user/libraries')['items'][0]['id'], 'movies')
+            for change in (lambda: self.session.select_profile('locked', '1234'), self.session.logout,
+                           lambda: Session.configure('https://other.example.test', self.temp.name)):
+                with self.assertRaises(Error) as raised:
+                    change()
+                self.assertEqual(raised.exception.code, 'playback_active')
+            self.assertEqual(self.session.status()['profile']['id'], 'open')
+        self.session.logout()
+        self.assertFalse(self.session.status()['signed_in'])
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
