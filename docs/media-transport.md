@@ -1,6 +1,6 @@
 # Renew media credentials without reopening playback
 
-Status: integrated for original HTTP media and supported text sidecars. Forced-rotation device acceptance passes; natural-expiry and sustained-bitrate qualification remain pending.
+Status: integrated for original HTTP media and supported text sidecars. Forced-rotation and synthetic client-expiry device acceptance pass for original and HLS media. A representative ten-minute high-bitrate window passes sampled checks; maximum bitrate is not established.
 
 ## Requirement
 
@@ -42,7 +42,7 @@ HLS manifests, segment authorization, and quality replans need a separate extens
 
 An ignored target prototype compared an eight-MiB direct read with a relayed read: status, content range, length, and SHA-256 matched. A real token refresh changed the authority used by the next successful suffix-range request. HEAD preserved the source length. Short throughput samples show feasibility, not sustained bitrate qualification. Private measurements and fixture identities remain outside version control.
 
-The integrated add-on passes the real-video smoke loop. Target checks also confirm selected text subtitles, a 60-second pause, resume and seeking after real credential rotation, and preservation of the new video during external replacement. The playback identity stays unchanged across rotation. A controlled upstream verifies range responses, current authority on new requests, profile rejection, redirect refusal, truncation, concurrency, and transfer cancellation. These tests do not prove behavior across natural expiry or maximum bitrate.
+The integrated add-on passes the real-video smoke loop. Target checks also confirm selected text subtitles, a 60-second pause, resume and seeking after real credential rotation, and preservation of the new video during external replacement. The playback identity stays unchanged across rotation. A controlled upstream verifies range responses, current authority on new requests, profile rejection, redirect refusal, truncation, concurrency, and transfer cancellation. Synthetic expiry acceptance additionally makes the client deadline overdue under the credential-store lock and observes normal real-server renewal during paused original and HLS playback. New credential fingerprints and deadlines, unchanged playback identity, distant seeking, and resume are verified. This does not change server token lifetime or establish maximum bitrate.
 
 An API-and-transport check on the target verifies subtitle On and Off replans within one session. After each resource replacement, the unchanged local video URL returns matching original bytes. The selected WebVTT artifact is readable; after Off, its retired URL returns 404. This check does not open Kodi playback and therefore does not establish mid-playback subtitle rendering or remote-menu behavior.
 
@@ -52,7 +52,7 @@ Release qualification must cover:
 2. Reject an old credential at a controlled upstream, rotate credentials through the shared session, and prove the next read uses the new authority without changing the playback URL.
 3. Exercise profile rejection, upstream redirects, unknown local paths, stop during reads, client disconnects, and shutdown with stalled workers. Independently verify listener closure and worker termination.
 4. Run the real-video smoke loop through the relay, including subtitles, a long pause, seeks, replacement, and cleanup. Verify Silo progress independently.
-5. Qualify playback across natural token expiry and sustained high-bitrate peaks before claiming long-session or maximum-bitrate support. HDR and lossless audio qualification still require the complete output chain.
+5. Use deterministic expiry and rejected-token tests plus real-server renewal during playback as the repeatable renewal gate. Natural wall-clock expiry is optional additional coverage; broader sustained high-bitrate peaks remain necessary before claiming maximum-bitrate support. HDR and lossless audio qualification still require the complete output chain.
 
 ## References
 

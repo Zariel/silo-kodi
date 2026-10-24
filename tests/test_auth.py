@@ -188,6 +188,40 @@ class Authentication(unittest.TestCase):
         for call in self.calls('/profiles'):
             self.assertEqual(call[3]['Authorization'], 'Bearer access-2')
 
+    def test_rejected_token_renews_persistently(self):
+        self.approve()
+        request = self.server.request
+        observed = []
+
+        def reject_old_access(method, path, body=None, headers=None):
+            if path == '/profiles':
+                observed.append(headers['Authorization'])
+                if headers['Authorization'] == 'Bearer access-1':
+                    raise Error('unauthorized', 401)
+            return request(method, path, body, headers)
+
+        self.server.request = reject_old_access
+        self.assertEqual(self.session.profiles()[0]['id'], 'open')
+        reopened = Session('https://silo.example.test', self.temp.name, self.server)
+        self.assertEqual(reopened.profiles()[0]['id'], 'open')
+        self.assertEqual(observed, ['Bearer access-1', 'Bearer access-2', 'Bearer access-2'])
+        self.assertEqual(len(self.calls('/auth/refresh')), 1)
+
+    def test_rejected_retry_does_not_refresh_again(self):
+        self.approve()
+        request = self.server.request
+
+        def reject_access(method, path, body=None, headers=None):
+            if path == '/profiles':
+                raise Error('unauthorized', 401)
+            return request(method, path, body, headers)
+
+        self.server.request = reject_access
+        with self.assertRaises(Error) as raised:
+            self.session.profiles()
+        self.assertEqual(raised.exception.status, 401)
+        self.assertEqual(len(self.calls('/auth/refresh')), 1)
+
     def test_refresh_outage_preserves_login_but_refusal_clears_it(self):
         self.approve()
         later = time.time() + 7200

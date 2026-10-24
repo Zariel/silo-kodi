@@ -179,3 +179,11 @@ If both layout and aggregate endpoints are unsupported, discover visible rows th
 ## Temporary window harness cleanup
 
 Close a test-owned `WindowXML` normally and let `doModal()` return before finishing its script. `StopScript` requests interpreter abort; it does not call the window’s `close()` method. Forced script shutdown during playback’s return to a modal window left the GUI unresponsive in one acceptance run. A service restart restored the GUI and preserved the saved Silo login; the corrected harness passed playback and verified idle protection afterward. Use observed menu focus and dialog identity before sending selections, rather than relying on fixed delays.
+
+## Test token renewal without waiting
+
+Deterministic authentication tests advance the client clock to exercise proactive refresh, overlapping callers, refresh failure, and profile isolation. Rejected-token tests verify one refresh/retry and persistence for a fresh client instance; a second rejection must not loop. Run these through `python scripts/dev.py check`.
+
+For device acceptance, start owned playback and pause it. Under the shared credential-store lock, save the original expiry and an access-token fingerprint, then make only `expires_at` overdue. Let the normal playback owner perform renewal; do not call refresh directly or change server token lifetime. Observe a different persisted credential fingerprint and a future deadline from another process. Verify pause and playback identity remain unchanged, seek to a distant position, resume, and observe clock advancement. Repeat with supported HLS delivery. On failure, restore the old deadline only if the credential fingerprint is unchanged; never overwrite a newly rotated credential pair. Keep this test state and evidence outside version control.
+
+Both original playback and 360p HLS pass this synthetic-expiry check, followed by ownership release and verified idle protection. This exercises real renewal and persistence while avoiding a wait for the server token lifetime. Natural wall-clock expiry remains optional additional coverage, not the renewal release gate.

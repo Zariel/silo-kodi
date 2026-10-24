@@ -87,7 +87,7 @@ A target API probe advertised experimental HLS support without changing installe
 
 That initial probe established native-engine feasibility only; subsequent checks below cover integration separately.
 
-A subsequent target probe used the relay for the playlist and segments, paused, rotated the real access credential, sought to nine minutes, and observed advancing playback and media requests with fresh authority. Controlled-origin tests independently reject stale authority and verify query preservation, rewritten HEAD length, retired references, and late responses after a replan. Natural expiry remains unqualified.
+A subsequent target probe used the relay for the playlist and segments, paused, rotated the real access credential, sought to nine minutes, and observed advancing playback and media requests with fresh authority. Controlled-origin tests independently reject stale authority and verify query preservation, rewritten HEAD length, retired references, and late responses after a replan. A synthetic overdue client deadline also triggers the normal real-server renewal path while HLS is paused; the credential fingerprint changes, its saved deadline advances, and playback identity, seeking, and resume remain intact. This qualifies renewal without waiting for the server token lifetime.
 
 The shared replan implementation has also been exercised against the server: original to 360p at 120 seconds, subtitle Off retaining 360p, and Auto returning to original at 125 seconds. The returned plans preserved the requested start positions, and the probe closed its session. This checks the negotiation contract without opening Kodi playback; it does not qualify player transitions. Focused tests cover unknown labels, stable retries, track preservation, quality persistence across subtitle changes, and rejection of an anchored HLS timeline while retaining the committed plan for cleanup.
 
@@ -101,7 +101,7 @@ The full acceptance scope remains:
 2. Real original → lower quality → Auto transitions, including repeated choices, seeking in both directions, and independently observed Silo progress.
 3. A quality change while paused, delayed readiness, an unavailable rung, an uncertain replan response, stop during transition, and external replacement during transition.
 4. Selected text subtitles and audio behavior across transitions. Do not equate track numbers across original and packaged media.
-5. Credential rotation during HLS and a later segment request, followed by natural-expiry qualification.
+5. Credential renewal during HLS and a later segment request. Synthetic client-expiry acceptance passes; natural wall-clock expiry is optional additional coverage.
 
 ## References
 
