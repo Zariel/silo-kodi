@@ -193,9 +193,6 @@ def play(handle, session, profile_id, file_id, title, start_position=None, sourc
                     last_position = position
                     request = controls.take()
                     if request is not None:
-                        previous_file = attempt.plan.get('effective_media_file_id')
-                        if not previous_file:
-                            raise Error('unsupported_playback')
                         previous_delivery = attempt.plan.get('delivery')
                         audio_track = None
                         try:
@@ -226,8 +223,6 @@ def play(handle, session, profile_id, file_id, title, start_position=None, sourc
                             attempt.select_subtitle(request['subtitle'], position, audio_track=audio_track)
                         if not _owns(player, url, source):
                             break
-                        if attempt.plan.get('effective_media_file_id') != previous_file:
-                            raise Error('unsupported_playback')
                         # HLS demuxers retain segment grants from their playlist.
                         # Reopen each new HLS plan to acquire its replacement grants.
                         reopen = (quality_change or previous_delivery == 'server_transcode_hls'

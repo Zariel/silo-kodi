@@ -194,7 +194,10 @@ class Attempt:
         self.subtitle_url = None
         self.embedded_subtitle_index = None
         if (result.get('outcome') != 'playable' or not self.session_id or not self.plan
-                or result.get('session_id') != self.session_id):
+                or result.get('session_id') != self.session_id
+                or self.plan.get('effective_media_file_id') != self.body['file_id']):
+            # Track identities and the resume timeline belong to the chosen file,
+            # including when a server cannot negotiate fixed_media_file_v1.
             raise Error('unsupported_playback')
         delivery = self.plan.get('delivery')
         timeline = self.plan.get('timeline', {})

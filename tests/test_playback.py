@@ -24,6 +24,7 @@ class Server:
         self.subtitle = {'mode': 'off'}
         self.replans = 0
         self.versions = []
+        self.file_id = None
         self.features = ['fixed_media_file_v1']
         self.subtitle_mode = 'render'
         self.tracks = {'audio': {'id': 'audio-commentary', 'index': 2}}
@@ -40,6 +41,8 @@ class Server:
             raise Error('connection_failed')
         if path == '/playback/capabilities':
             return {'allowed': True, 'protocol_versions': [3], 'installation_id': 'server-install', 'features': self.features}
+        if path == '/playback/start':
+            self.file_id = body['file_id']
         if path.endswith('/replan'):
             self.replans += 1
             self.tracks = body['selected_tracks']
@@ -51,6 +54,7 @@ class Server:
         if path == '/playback/start' or path.endswith('/replan'):
             return {'outcome': 'playable', 'session_id': 'session-1', 'playback_plan': {
                 'plan_id': 'plan-' + str(self.replans), 'plan_attempt_key': 'original-recipe',
+                'effective_media_file_id': self.file_id,
                 'selected_tracks': self.tracks,
                 'available_qualities': [{'label': 'original'}, {'label': '360p'}],
                 'delivery': self.delivery, 'stream': {'url': '/api/v2/stream/session-1?st=grant', 'header_refresh': 'none',
@@ -61,6 +65,37 @@ class Server:
 
 
 class Playback(unittest.TestCase):
+    def test_rejects_wrong_source_before_returning_media_grant(self):
+        for stage in ('start', 'replan'):
+            for identity in (None, 'different-file'):
+                for features in ([], ['fixed_media_file_v1']):
+                    with self.subTest(stage=stage, identity=identity, features=features):
+                        server = Server()
+                        server.features = features
+                        attempt = Attempt(server, 'viewer', 'chosen-file')
+                        if stage == 'replan':
+                            attempt.start()
+                        request = server.request
+
+                        def changed_source(method, path, body=None, expected_profile=None):
+                            response = request(method, path, body, expected_profile)
+                            if 'playback_plan' in response:
+                                if identity is None:
+                                    response['playback_plan'].pop('effective_media_file_id')
+                                else:
+                                    response['playback_plan']['effective_media_file_id'] = identity
+                            return response
+
+                        with patch.object(server, 'request', side_effect=changed_source):
+                            with self.assertRaises(Error) as raised:
+                                if stage == 'start':
+                                    attempt.start()
+                                else:
+                                    attempt.select_quality('360p', 24)
+                            self.assertEqual(raised.exception.code, 'unsupported_playback')
+                            attempt.stop()
+                        self.assertEqual(server.calls[-1][:2], ('DELETE', '/playback/session-1'))
+
     def test_pgs_replans_use_native_original_then_burned_in_hls(self):
         server = Server()
         server.features.append('embedded_subtitles_v1')
