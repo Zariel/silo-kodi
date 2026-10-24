@@ -63,6 +63,8 @@ class Window:
 class HomeNavigation(unittest.TestCase):
     def setUp(self):
         modules = {name: Mock() for name in ('xbmc', 'xbmcaddon', 'xbmcvfs', 'silo.controls')}
+        modules['silo.controls'].active_playback.return_value = None
+        modules['xbmcaddon'].Addon.return_value.getAddonInfo.return_value = '/addon'
         modules['xbmcgui'] = SimpleNamespace(WindowXML=Window, ListItem=lambda label: Mock(label=label))
         modules['silo.ui'] = SimpleNamespace(open_account=Mock(), _text=str)
         path = Path(__file__).resolve().parents[1] / 'plugin.video.silo/resources/lib/silo/browser.py'
@@ -140,6 +142,7 @@ class HomeNavigation(unittest.TestCase):
         for choice, restart in ((0, None), (1, ['true'])):
             with self.subTest(choice=choice), patch.object(globals_['xbmcgui'], 'Dialog', return_value=dialog, create=True):
                 dialog.contextmenu.return_value = choice
+                self.window._detail('a')
                 self.window.onClick(300)
                 query = parse_qs(urlsplit(player.play.call_args.args[0]).query)
                 self.assertEqual(query['file'], ['chosen'])
@@ -253,3 +256,39 @@ class HomeNavigation(unittest.TestCase):
         self.catalog.home_page.side_effect = change_profile
         self.window._prefetch()
         self.assertEqual([item.label for item in self.window.getControl(200).items], ['first', 'second'])
+
+    def test_playback_returns_to_origin_and_back_reopens_video(self):
+        control = self.library()
+        control.selectItem(12)
+        self.window.onClick(200)
+        self.catalog.watch.return_value = {'versions': [{'file_id': 'file'}], 'user_data': {}}
+        globals_ = self.window.onClick.__globals__
+        globals_['xbmc'].Player.return_value.isPlaying.return_value = False
+        self.window.onClick(300)
+        self.assertEqual(self.window.page['kind'], 'library')
+        self.assertEqual(control.position, 12)
+
+        globals_['active_playback'].return_value = {'content_id': '12'}
+        self.window.onAction(SimpleNamespace(getId=lambda: 92))
+        globals_['xbmc'].executebuiltin.assert_called_once_with('ActivateWindow(fullscreenvideo)')
+        self.assertFalse(self.window.closed.is_set())
+        self.assertEqual(control.position, 12)
+
+    def test_browsing_during_playback_keeps_detail_back_navigation(self):
+        self.library()
+        origin = self.window.page
+        self.window.playback_page = origin
+        self.window.onClick(200)
+        globals_ = self.window.onClick.__globals__
+        globals_['active_playback'].return_value = {'content_id': 'other'}
+        self.window.onAction(SimpleNamespace(getId=lambda: 92))
+        self.assertIs(self.window.page, origin)
+        globals_['xbmc'].executebuiltin.assert_not_called()
+
+    def test_menu_keeps_playback_choices_without_sidebar_entry(self):
+        self.window._menu()
+        self.assertEqual([item.label for item in self.window.getControl(100).items], ['Home', 'Account', 'Close'])
+        globals_ = self.window.onClick.__globals__
+        globals_['active_playback'].return_value = {'content_id': 'movie'}
+        self.window.onAction(SimpleNamespace(getId=lambda: 117))
+        globals_['playback_options'].assert_called_once()

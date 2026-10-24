@@ -18,8 +18,10 @@ def _read(window, key):
 
 
 class PlaybackControls:
-    def __init__(self):
+    def __init__(self, profile_id=None, content_id=None):
         self.window = xbmcgui.Window(10000)
+        self.profile_id = profile_id
+        self.content_id = content_id
         self.state = {}
         self.window.clearProperty(_STATE)
         self.window.clearProperty(_REQUEST)
@@ -39,6 +41,7 @@ class PlaybackControls:
                                          or (not pgs and track.get('delivery') == 'sidecar'))})
         # Publish only UI metadata, never stream URLs, headers, or credentials.
         self.state = {'revision': str(uuid.uuid4()), 'tracks': tracks,
+                      'profile_id': self.profile_id, 'content_id': self.content_id,
                       'qualities': [entry['label'] for entry in plan.get('available_qualities', [])],
                       'quality': quality,
                       'selected': subtitle.get('track_id') if subtitle.get('mode') != 'off' else None}
@@ -68,7 +71,14 @@ class PlaybackControls:
         self.window.clearProperty(_REQUEST)
 
 
-def now_playing():
+def active_playback(profile_id):
+    state = _read(xbmcgui.Window(10000), _STATE)
+    if state.get('profile_id') == profile_id and xbmc.Player().isPlayingVideo():
+        return state
+    return None
+
+
+def playback_options():
     window = xbmcgui.Window(10000)
     state = _read(window, _STATE)
     dialog = xbmcgui.Dialog()
@@ -78,13 +88,10 @@ def now_playing():
     if state.get('busy'):
         dialog.notification('Silo', 'Applying playback choice…')
         return
-    action = dialog.contextmenu(['Return to video', 'Subtitles', 'Quality'])
-    if action == 0:
-        xbmc.executebuiltin('ActivateWindow(fullscreenvideo)')
+    action = dialog.contextmenu(['Subtitles', 'Quality'])
+    if action not in (0, 1):
         return
-    if action not in (1, 2):
-        return
-    if action == 2:
+    if action == 1:
         qualities = ['auto'] + [q for q in state.get('qualities', []) if q != 'auto']
         labels = ['Auto'] + [str(q).replace('[', '(').replace(']', ')') for q in qualities[1:]]
         selected = qualities.index(state['quality']) if state.get('quality') in qualities else 0

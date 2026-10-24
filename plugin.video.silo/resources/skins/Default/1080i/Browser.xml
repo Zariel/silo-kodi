@@ -123,5 +123,6 @@
         <control type="label"><left>10</left><top>300</top><width>185</width><height>38</height><font>font20</font><textcolor>FFA4A4AE</textcolor><label>$INFO[ListItem.Property(meta)]</label></control>
       </focusedlayout>
     </control>
+    <control type="label"><left>210</left><top>1040</top><width>1500</width><height>35</height><font>font20</font><textcolor>FFA4A4AE</textcolor><label>Menu: subtitles and quality · Back: return to video</label><visible>Player.HasVideo + !String.IsEmpty(Window(Home).Property(silo.playback.state))</visible></control>
   </controls>
 </window>

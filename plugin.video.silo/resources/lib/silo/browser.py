@@ -10,7 +10,7 @@ import xbmcgui
 import xbmcvfs
 
 from .catalog import Catalog, artwork
-from .controls import now_playing
+from .controls import active_playback, playback_options
 from .client import Error, Session
 from .ui import open_account, _text
 
@@ -24,6 +24,8 @@ class BrowserWindow(xbmcgui.WindowXML):
         self.history = []
         self.page = None
         self.account_requested = False
+        self.playback_page = None
+        self.playback_history = []
         self.closed = threading.Event()
         self.busy = False
         self.worker = None
@@ -82,7 +84,7 @@ class BrowserWindow(xbmcgui.WindowXML):
     def _menu(self):
         menu = self.getControl(100)
         menu.reset()
-        media = Path(xbmcaddon.Addon().getAddonInfo('path')) / 'resources/skins/Default/media'
+        media = Path(xbmcaddon.Addon('plugin.video.silo').getAddonInfo('path')) / 'resources/skins/Default/media'
 
         def add(label, icon):
             item = xbmcgui.ListItem(label)
@@ -92,7 +94,6 @@ class BrowserWindow(xbmcgui.WindowXML):
         add('Home', 'home')
         for library in self.libraries:
             add(_text(library['name']), 'tv' if library.get('type') == 'series' else 'movies')
-        add('Now playing', 'play')
         add('Account', 'account')
         add('Close', 'close')
         self.getControl(11).setLabel(_text(self.session.status()['profile']['name']))
@@ -262,7 +263,9 @@ class BrowserWindow(xbmcgui.WindowXML):
                 else:
                     self.getControl(300).setVisible(True)
                     self.getControl(300).setEnabled(True)
-                    self.getControl(300).setLabel('Play')
+                    playing = active_playback(self.catalog.profile_id)
+                    self.getControl(300).setLabel('Return to video' if playing and
+                                                 playing.get('content_id') == data['content_id'] else 'Play')
         control = self.getControl(control_id)
         control.selectItem(page.get('selection', 0))
         playable = kind == 'item' and page['data']['type'] in ('movie', 'episode')
@@ -354,6 +357,10 @@ class BrowserWindow(xbmcgui.WindowXML):
                 self.getControl(100).controlRight(control)
 
     def _play(self):
+        playing = active_playback(self.catalog.profile_id)
+        if playing and playing.get('content_id') == self.page['data']['content_id']:
+            self._video()
+            return
         if xbmc.Player().isPlaying():
             raise Error('playback_active')
         data = self.page['data']
@@ -387,12 +394,25 @@ class BrowserWindow(xbmcgui.WindowXML):
         if restart:
             query['restart'] = 'true'
         self._remember()
+        if self.history:
+            self._show(self.history.pop())
+        self.playback_page = self.page
+        self.playback_history = list(self.history)
         xbmc.Player().play('plugin://plugin.video.silo/?' + urlencode(query))
+
+    def _video(self):
+        if self.playback_page is not None and self.page is not self.playback_page:
+            self.history = list(self.playback_history)
+            self._show(self.playback_page)
+        xbmc.executebuiltin('ActivateWindow(fullscreenvideo)')
 
     def _back(self):
         if self.busy:
             return
-        if self.history:
+        playing = active_playback(self.catalog.profile_id)
+        if playing and (self.page is self.playback_page or not self.history):
+            self._task(self._video)
+        elif self.history:
             page = self.history.pop()
             self._task(lambda: self._show(page))
         else:
@@ -408,8 +428,6 @@ class BrowserWindow(xbmcgui.WindowXML):
             elif index <= len(self.libraries):
                 self._task(lambda: self._library(self.libraries[index - 1]))
             elif index == len(self.libraries) + 1:
-                self._task(now_playing)
-            elif index == len(self.libraries) + 2:
                 self.account_requested = True
                 self.close()
             else:
@@ -445,6 +463,9 @@ class BrowserWindow(xbmcgui.WindowXML):
             self._task(self._play)
 
     def onAction(self, action):
+        if action.getId() == 117 and active_playback(self.catalog.profile_id):
+            self._task(playback_options)
+            return
         if (not self.busy and self.page and self.page['kind'] == 'home'
                 and self.getFocusId() in (230, 231) and action.getId() in (3, 4)):
             direction = 1 if action.getId() == 4 else -1

@@ -86,7 +86,7 @@ def play(handle, session, profile_id, file_id, title, start_position=None, sourc
     try:
         with session.store.playback_lock():
             try:
-                controls = PlaybackControls()
+                controls = PlaybackControls(profile_id, content_id)
                 attempt = Attempt(session, profile_id, file_id, start_position,
                                   subtitle_track_id=subtitle_track_id, content_id=content_id)
                 audio = SourceAudio(file_id, attempt.audio_tracks,
