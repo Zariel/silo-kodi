@@ -48,6 +48,8 @@ Kodi broadcasts player callbacks to all registered Python Player instances, and 
 
 After readiness, restore the plan's player position, wait for the observed clock to settle, apply the subtitle decision, and restore pause. Do not report startup zero as a new watch position. Only publish the completed UI selection after the player reaches the intended state. If the committed plan cannot be opened, report the failure and clean up the owned session rather than continuing with stale server identity.
 
+Apply this transition to every replan involving transcoded HLS, including subtitle-only changes. The target retained old segment URLs after a subtitle replan; a subsequent seek received 404 for a retired grant. Reopening creates a new demuxer that consumes the new playlist. Keep grant retirement in the relay instead of extending old-plan authority to accommodate a cached playlist. Original-to-original sidecar changes can keep the player open.
+
 ## Evidence and remaining acceptance
 
 A target API probe advertised experimental HLS support without changing installed capabilities. The server returned six fixed rungs for the selected SDR fixture. Selecting its 360p entry returned `server_transcode_hls`, a full timeline, and a finite authenticated media playlist. A separate temporary script opened a fresh 360p plan in Kodi's native player, sought to 90 seconds, observed clock advancement, then stopped and closed the session. No InputStream Adaptive configuration or device output settings changed.

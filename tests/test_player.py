@@ -13,7 +13,8 @@ class Lifetime(unittest.TestCase):
     def run_playback(self, scenario, source=None):
         state = SimpleNamespace(file=None, closed=False, relay_closed=False, clock=0, player=None,
                                 subtitles=[], relay_updated=False, item_properties={}, position=20,
-                                paused=scenario.startswith('quality'), done=False, samples=[], opens=[])
+                                paused=scenario.startswith('quality') or scenario == 'hls_subtitle',
+                                done=False, samples=[], opens=[])
         url = 'https://silo.example.test/api/v2/stream/owned'
 
         class Player:
@@ -72,6 +73,7 @@ class Lifetime(unittest.TestCase):
             def __init__(self, *args, **kwargs):
                 self.body = {'quality_preference': 'auto'}
                 self.plan = {'stream': {}, 'timeline': {'player_start_seconds': 0}, 'effective_media_file_id': 'file'}
+                self.plan['delivery'] = 'server_transcode_hls' if scenario == 'hls_subtitle' else 'original_http'
                 self.plan['subtitle'] = {'artifact': {'format': 'vtt'}}
                 self.subtitle_url = '/subtitle.vtt' if scenario == 'subtitle_error' else None
 
@@ -80,10 +82,14 @@ class Lifetime(unittest.TestCase):
 
             def sample(self, *args):
                 state.samples.append(args)
-                if state.opens:
+                if state.opens or scenario == 'hls_subtitle':
                     state.done = True
 
             def select_subtitle(self, track, position):
+                if scenario == 'hls_subtitle':
+                    self.plan_attempt_id = 'new-plan'
+                    self.plan['timeline']['player_start_seconds'] = position
+                    return
                 state.file = 'https://other.example.test/replacement'
                 self.subtitle_url = '/subtitle.vtt'
                 self.plan_attempt_id = 'new-plan'
@@ -135,6 +141,8 @@ class Lifetime(unittest.TestCase):
             controls.take.return_value = {'subtitle': 'track'} if scenario == 'replan_replacement' else None
             if scenario.startswith('quality'):
                 controls.take.side_effect = [{'quality': '360p'}, None]
+            if scenario == 'hls_subtitle':
+                controls.take.side_effect = [{'subtitle': None}, None]
             with patch.object(module, 'Attempt', Attempt), patch.object(module, 'MediaRelay', Relay), patch.object(module, 'PlaybackControls', return_value=controls), patch.object(module.time, 'monotonic', lambda: state.clock):
                 session = SimpleNamespace(store=SimpleNamespace(playback_lock=nullcontext))
                 module.play(1, session, 'profile', 'file', 'Title', source=source)
@@ -147,6 +155,13 @@ class Lifetime(unittest.TestCase):
 
     def test_quality_reopen_restores_paused_position_before_reporting(self):
         state = self.run_playback('quality')
+        self.assertEqual(state.samples, [(20, True)])
+        self.assertEqual(len(state.opens), 1)
+        self.assertTrue(state.closed)
+        self.assertIsNone(state.file)
+
+    def test_hls_subtitle_replan_reopens_and_restores_paused_position(self):
+        state = self.run_playback('hls_subtitle')
         self.assertEqual(state.samples, [(20, True)])
         self.assertEqual(len(state.opens), 1)
         self.assertTrue(state.closed)

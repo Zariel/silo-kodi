@@ -156,6 +156,7 @@ def play(handle, session, profile_id, file_id, title, start_position=None, sourc
                         previous_file = attempt.plan.get('effective_media_file_id')
                         if not previous_file:
                             raise Error('unsupported_playback')
+                        previous_delivery = attempt.plan.get('delivery')
                         quality_change = 'quality' in request
                         if quality_change:
                             attempt.select_quality(request['quality'], position)
@@ -165,7 +166,11 @@ def play(handle, session, profile_id, file_id, title, start_position=None, sourc
                             break
                         if attempt.plan.get('effective_media_file_id') != previous_file:
                             raise Error('unsupported_playback')
-                        if quality_change:
+                        # HLS demuxers retain segment grants from their playlist.
+                        # Reopen each new HLS plan to acquire its replacement grants.
+                        reopen = (quality_change or previous_delivery == 'server_transcode_hls'
+                                  or attempt.plan.get('delivery') == 'server_transcode_hls')
+                        if reopen:
                             video_name = 'video-' + attempt.plan_attempt_id
                         resources = {video_name: attempt.plan['stream']}
                         if attempt.subtitle_url:
@@ -174,7 +179,7 @@ def play(handle, session, profile_id, file_id, title, start_position=None, sourc
                             resources[subtitle_name] = artifact
                         relay.update(resources)
                         tracks_applied = False
-                        if quality_change:
+                        if reopen:
                             pending_url = url
                             url = relay.url(video_name)
                             restore_pause = paused
