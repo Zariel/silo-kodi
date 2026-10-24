@@ -21,6 +21,8 @@ The build writes `dist/plugin.video.silo-VERSION.zip` and a matching `.zip.sha25
 4. Publish a GitHub Release for that tag. The **Release ZIP** workflow checks the tagged source, verifies the version, and attaches the ZIP and checksum to that release.
 5. Confirm the workflow succeeded and both assets appear on the release. Download the ZIP and checksum, verify the digest, and test installation or upgrade in Kodi.
 
+The manual Kodi ZIP installer is device-checked for replacing the package while preserving the saved session. First launch with an empty data directory opens manual server setup.
+
 The workflow does not publish a release itself. Publishing the release triggers asset generation, so assets appear only after the job succeeds. Existing assets cause upload to fail instead of being overwritten. Inspect a failed run before changing any published assets.
 
 The **Check and package** workflow also runs on pull requests and pushes to `main`. Its downloadable artifact wraps the add-on ZIP and checksum; extract that wrapper before installing the add-on ZIP in Kodi. Local checks and workflow linting do not prove that a workflow has run successfully on GitHub.
