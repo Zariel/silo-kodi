@@ -11,7 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'plugin.video.silo/
 
 class Lifetime(unittest.TestCase):
     def run_playback(self, scenario):
-        state = SimpleNamespace(file=None, closed=False, clock=0, player=None)
+        state = SimpleNamespace(file=None, closed=False, relay_closed=False, clock=0, player=None)
         url = 'https://silo.example.test/api/v2/stream/owned'
 
         class Player:
@@ -51,6 +51,7 @@ class Lifetime(unittest.TestCase):
         class Attempt:
             def __init__(self, *args, **kwargs):
                 self.plan = {'stream': {}, 'timeline': {'player_start_seconds': 0}}
+                self.plan['subtitle'] = {'artifact': {'format': 'vtt'}}
                 self.subtitle_url = '/subtitle.vtt' if scenario == 'subtitle_error' else None
 
             def start(self):
@@ -61,6 +62,16 @@ class Lifetime(unittest.TestCase):
 
             def stop(self, *args):
                 state.closed = True
+
+        class Relay:
+            def __init__(self, *args):
+                pass
+
+            def url(self, name):
+                return url if name == 'video' else '/subtitle.vtt'
+
+            def close(self):
+                state.relay_closed = True
 
         def resolve(handle, success, item):
             if success:
@@ -79,7 +90,7 @@ class Lifetime(unittest.TestCase):
         module = importlib.util.module_from_spec(spec)
         with patch.dict(sys.modules, modules):
             spec.loader.exec_module(module)
-            with patch.object(module, 'Attempt', Attempt), patch.object(module.time, 'monotonic', lambda: state.clock):
+            with patch.object(module, 'Attempt', Attempt), patch.object(module, 'MediaRelay', Relay), patch.object(module.time, 'monotonic', lambda: state.clock):
                 session = SimpleNamespace(store=SimpleNamespace(playback_lock=nullcontext))
                 module.play(1, session, 'profile', 'file', 'Title')
         return state
@@ -90,8 +101,10 @@ class Lifetime(unittest.TestCase):
                 state = self.run_playback(scenario)
                 self.assertIsNone(state.file)
                 self.assertTrue(state.closed)
+                self.assertTrue(state.relay_closed)
 
     def test_cleanup_preserves_replacement(self):
         state = self.run_playback('replacement')
         self.assertEqual(state.file, 'https://other.example.test/replacement')
         self.assertTrue(state.closed)
+        self.assertTrue(state.relay_closed)

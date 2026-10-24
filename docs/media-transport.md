@@ -1,6 +1,6 @@
 # Renew media credentials without reopening playback
 
-Status: transport choice supported by a target prototype; integration into the add-on remains pending.
+Status: integrated for original HTTP media and supported text sidecars. Forced-rotation device acceptance passes; natural-expiry and sustained-bitrate qualification remain pending.
 
 ## Requirement
 
@@ -40,7 +40,9 @@ HLS manifests, segment authorization, and quality replans need a separate extens
 
 An ignored target prototype compared an eight-MiB direct read with a relayed read: status, content range, length, and SHA-256 matched. A real token refresh changed the authority used by the next successful suffix-range request. HEAD preserved the source length. Short throughput samples show feasibility, not sustained bitrate qualification. Private measurements and fixture identities remain outside version control.
 
-Before integration is considered complete:
+The integrated add-on passes the real-video smoke loop. Target checks also confirm selected text subtitles, a 60-second pause, resume and seeking after real credential rotation, and preservation of the new video during external replacement. The playback identity stays unchanged across rotation. A controlled upstream verifies range responses, current authority on new requests, profile rejection, redirect refusal, truncation, concurrency, and transfer cancellation. These tests do not prove behavior across natural expiry or maximum bitrate.
+
+Release qualification must cover:
 
 1. Test prefix, suffix, open-ended and unsatisfiable ranges, HEAD, truncated transfers, and concurrent requests through the public loopback interface.
 2. Reject an old credential at a controlled upstream, rotate credentials through the shared session, and prove the next read uses the new authority without changing the playback URL.

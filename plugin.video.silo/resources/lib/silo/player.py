@@ -7,6 +7,7 @@ import xbmcplugin
 
 from .client import Error
 from .playback import Attempt
+from .relay import MediaRelay
 
 
 class _Player(xbmc.Player):
@@ -37,6 +38,7 @@ def _owns(player, url, source):
 
 def play(handle, session, profile_id, file_id, title, start_position=None, source=None, subtitle_track_id=None):
     attempt = None
+    relay = None
     resolved = False
     last_position = None
     paused = False
@@ -47,7 +49,15 @@ def play(handle, session, profile_id, file_id, title, start_position=None, sourc
         with session.store.playback_lock():
             try:
                 attempt = Attempt(session, profile_id, file_id, start_position, subtitle_track_id=subtitle_track_id)
-                url = attempt.start()
+                attempt.start()
+                resources = {'video': attempt.plan['stream']}
+                subtitle_name = None
+                if attempt.subtitle_url:
+                    artifact = attempt.plan['subtitle']['artifact']
+                    subtitle_name = 'subtitle.' + ('srt' if artifact['format'] == 'srt' else 'vtt')
+                    resources[subtitle_name] = artifact
+                relay = MediaRelay(session, profile_id, resources)
+                url = relay.url('video')
                 xbmc.log('Silo: playback plan accepted', xbmc.LOGINFO)
                 item = xbmcgui.ListItem(label=title, path=url)
                 item.setContentLookup(False)
@@ -95,7 +105,7 @@ def play(handle, session, profile_id, file_id, title, start_position=None, sourc
                             continue
                     if not tracks_applied:
                         if attempt.subtitle_url:
-                            player.setSubtitles(attempt.subtitle_url)
+                            player.setSubtitles(relay.url(subtitle_name))
                             player.showSubtitles(True)
                         else:
                             player.showSubtitles(False)
@@ -121,13 +131,17 @@ def play(handle, session, profile_id, file_id, title, start_position=None, sourc
                             player.stop()
                     except RuntimeError:
                         pass
-                if attempt:
-                    try:
-                        xbmc.log('Silo: closing playback session', xbmc.LOGINFO)
-                        attempt.stop(last_position, paused)
-                        xbmc.log('Silo: playback session closed', xbmc.LOGINFO)
-                    except Error:
-                        xbmc.log('Silo: could not confirm playback cleanup; server expiry will reclaim the session', xbmc.LOGWARNING)
+                try:
+                    if relay:
+                        relay.close()
+                finally:
+                    if attempt:
+                        try:
+                            xbmc.log('Silo: closing playback session', xbmc.LOGINFO)
+                            attempt.stop(last_position, paused)
+                            xbmc.log('Silo: playback session closed', xbmc.LOGINFO)
+                        except Error:
+                            xbmc.log('Silo: could not confirm playback cleanup; server expiry will reclaim the session', xbmc.LOGWARNING)
     except Error as exc:
         xbmcgui.Dialog().notification('Silo', str(exc), xbmcgui.NOTIFICATION_ERROR)
     except Exception:
