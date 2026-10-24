@@ -1,36 +1,51 @@
 # Silo for Kodi
 
-A browsing client for Silo, targeting Kodi 21 on CoreELEC. The client uses Silo account authentication and profiles, browses libraries on demand, and delegates media playback to Kodi without syncing the catalog into Kodi's library.
+Browse your Silo movies and TV shows and watch them in Kodi. Sign in with a QR code, choose your profile, and explore your Home page and libraries without importing them into Kodi's library.
 
-**Status:** initial release candidate validated on the test device. Version `0.3.0` provides QR sign-in, profile selection, Home, library and detail screens, native video playback with Silo progress reporting, quality selection, and text/embedded PGS subtitle selection. Representative movies, episodes, pause, resume, start-over, combined subtitle/quality changes, HDR10, and Dolby Vision with receiver-confirmed TrueHD/Atmos pass short checks on the test device. A ten-minute high-bitrate playback check passes sampled clock and buffering checks. Synthetic client-expiry checks verify real credential renewal during original and HLS playback. Broader bitrate/output coverage and additional subtitle formats remain unqualified.
+## Install
 
-Original-file presentation is delegated to Kodi, with declared codec eligibility up to 2160p. HDR, Dolby Vision/FEL, and audio passthrough depend on the device, Kodi build, and configuration. See the compatibility evidence below; these are not universal Kodi support claims.
+You need Kodi 21 or later, a Silo account, and the address of your Silo server.
 
-Home opens after profile selection and shows server-ordered rows using your configured accent. Use **View all** to browse a section, or choose a library from the sidebar. Returning from details refreshes the visible rows and retains the selected card when it still exists.
+1. Download `plugin.video.silo-VERSION.zip` from [GitHub Releases](https://github.com/Zariel/silo-kodi/releases).
+2. Copy the ZIP to a location Kodi can access.
+3. In Kodi, open **Settings → Add-ons → Install from zip file** and select the ZIP. If prompted, enable **Unknown sources** in Kodi's add-on settings.
+4. Open **Silo** from your add-ons.
 
-The [six-milestone delivery plan](docs/design.md#delivery-sequence-and-acceptance) includes making Silo Home the main page after playback quality and subtitles, using server-provided sections and ordering, with aggregate Home and profile-section-settings fallbacks.
+To update, download and install the replacement ZIP in the same way. Your saved sign-in is preserved.
 
-Use **Search** to find movies, series, and episodes when supported by your server. Results keep loading as you scroll. Hold Select on a remote mapped to Kodi's context menu, press Menu, or use keyboard **C** for title details, Play/Resume, watched status, favourites, and watchlist options.
+## Sign in
 
-During playback, press **Back** to return to the originating collection with the playing title selected. Open the context menu (**C** on a keyboard) and choose **Playback options → Subtitles** to select a supported text or embedded PGS track, or **Off**. PGS uses native rendering for original MKV playback and server burn-in for supported lower-quality HLS. Use this menu for subtitle changes; selections made directly in Kodi’s subtitle OSD are not yet reconciled with Silo on a replan. **Back** from that collection restores fullscreen playback. Kodi's normal controls remain available for pause, seek, and audio.
+1. Enter your Silo server address, including `https://`.
+2. Choose **Sign in**.
+3. Scan the QR code with your phone, or open the displayed address in a browser. Sign in to Silo and approve the device.
+4. Choose your profile and enter its PIN if prompted.
 
-Choose **context menu → Playback options → Quality** for Silo's available qualities or **Auto**. Changing quality preserves position and pause while reopening the video. The initial transcoded path supports SDR H.264/AAC HLS; other delivery combinations remain unqualified.
+Use **Account** in the sidebar to switch profiles or sign out. Stop playback before changing profiles or servers.
 
-Audio selected through Kodi's controls is carried across quality and subtitle changes when the source track can be matched uniquely. A nondefault soundtrack passes an original → 360p → Auto check. Ambiguous track metadata can prevent a playback change; the add-on reports this instead of guessing a soundtrack.
+## Browse and search
 
-- [Release acceptance and known limits](docs/acceptance.md)
-- [Minimal client design](docs/design.md)
-- [Development and target test loop](docs/testing.md)
-- [Packaging and GitHub Releases](docs/releases.md)
-- [Playback references and compatibility status](docs/playback-references.md)
-- [Contributor guidance](AGENTS.md)
+Home shows your Silo sections in their configured order and uses your Silo accent colour. Choose **View all** to explore a section, or select a library from the sidebar. More titles load automatically as you scroll.
 
-```sh
-nix develop path:.
-python scripts/dev.py check
-python scripts/dev.py package
-```
+Choose **Search** to find movies, TV shows, and episodes when supported by your server. Select a title to view its details, or open a TV show to browse its seasons and episodes.
 
-The ZIP is written to `dist/`. Follow the test guide for SSH setup and deployment. Local testing references and configuration belong in ignored `.local-testing/`. Internal notes, source snapshots, and raw output belong in ignored `.scratch/`; generated ZIPs belong in ignored `dist/`.
+Open a title's options with your remote's Menu button, a long press of Select if mapped to Kodi's context menu, or **C** on a keyboard. Options include:
 
-The [API usage audit](docs/api-audit.md) covers the complete v2 endpoint inventory, current actions, and deferred capabilities.
+- View details or play/resume a video.
+- Mark a title watched or unwatched.
+- Add or remove favourites.
+- Add or remove watchlist entries.
+
+Marking a TV show watched or unwatched applies to all its episodes.
+
+## Watch
+
+Choose **Play** on a movie or episode. If Silo has saved your progress, you can resume or start from the beginning. Use Kodi's playback controls to pause, seek, and select an audio track.
+
+Press **Back** during playback to browse the collection you started from, with the playing title selected. Press **Back** again from that collection to return to fullscreen video.
+
+While browsing during playback, open the context menu and choose **Playback options**:
+
+- **Quality:** choose from the qualities offered by Silo, or **Auto** to let Silo choose. Changing quality preserves your position and pause state.
+- **Subtitles:** choose an available subtitle track or **Off**. Use this menu for subtitle changes so Silo can apply them when changing playback quality.
+
+4K, HDR10, Dolby Vision, and lossless or surround audio depend on your Kodi device, its settings, and your TV or audio system. Configure video output and audio passthrough in Kodi.
