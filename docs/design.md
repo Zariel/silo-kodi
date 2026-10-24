@@ -8,9 +8,9 @@ Provide remote-controlled sign-in, account profile selection, on-demand library 
 
 Silo owns access control, catalog metadata, file selection authorization, and playback sessions. Kodi owns demuxing, decoding, audio passthrough, subtitle rendering, pause, seeking, and HDMI output. The add-on translates between these interfaces. It must not bypass Silo policy by opening an SMB/NFS path or reconstructing an unsigned file URL.
 
-The first usable release covers movies and TV episodes, including their audio tracks and embedded subtitles. Standalone audio scope needs confirmation: the native catalog includes audiobooks, but its inspected media scopes contain no music type; Silo explicitly excludes audio-library playback from its Jellyfin compatibility surface. Do not promise music browsing based on Kodi's audio support. Audiobook multipart timelines need a separate, small decision if requested.
+The first usable release covers movies and TV episodes, including their audio tracks and embedded subtitles. Standalone music and audiobooks are out of scope. Publish the add-on as a video provider; audio support means decoding or passing through the soundtrack within a video file.
 
-Exclude catalog synchronization, a local metadata database, custom skins, downloads, search/recommendation parity, watch parties, casting, admin operations, automatic adaptation, and server or firmware changes. Do not add a custom player or transcoder.
+Exclude catalog synchronization, a local metadata database, whole-Kodi skins, downloads, search/recommendation parity, watch parties, casting, admin operations, automatic adaptation, and server or firmware changes. Do not add a custom player or transcoder.
 
 ## Integration choice
 
@@ -23,6 +23,24 @@ Exclude catalog synchronization, a local metadata database, custom skins, downlo
 Use `/api/v2`, not the retiring v1 bridge. Resolve capabilities from the server instead of matching version strings. The live contract is available at `/api/v2/openapi.json`; record its digest when investigating incompatibility. Keep a handwritten client for the few operations below, rather than generating the whole server API.
 
 Use Python 3.11 and standard-library HTTP/JSON. Kodi's Python APIs are supplied by the target. Start with one plugin entry point and small internal modules for HTTP/authentication, directories, and playback as those responsibilities are implemented. Avoid a general routing framework.
+
+## User experience
+
+Provide a simple, remote-first experience that follows Silo's visual style. The reference is Silo's web UI, adapted for viewing across a room rather than copied at desktop density. Keep reference screenshots and deployment-specific UI examples in ignored `.local-testing/ui-references/`.
+
+The inspected Midnight Cinema theme uses near-black surfaces, restrained borders, light text, white primary actions, and rounded cards. Artwork, title information, and Play/Resume should dominate. Use a conspicuous focus indicator, predictable directional navigation, and readable text at normal TV distance. Restore focus and scroll position after returning from details or playback. Loading and failure states must remain navigable with the remote.
+
+| Presentation approach | Tradeoff |
+| --- | --- |
+| Standard plugin directories | Smallest implementation, but layout and appearance depend on the installed Kodi skin; insufficient for a consistent Silo interface |
+| Add-on-owned XML windows | Own the few Silo screens while retaining Kodi's renderer, input handling, and playback; recommended, subject to an early target prototype |
+| Whole-Kodi skin or embedded web UI | Expands ownership beyond this client and introduces unnecessary integration work |
+
+Prototype an add-on-owned poster grid and detail screen through `xbmcgui.WindowXML` before building the complete interface. Verify remote focus, scrolling, responsiveness, and return from playback on CoreELEC. Use this result to settle window lifetime and playback-session ownership together; the earlier plugin-invocation monitor proposal remains provisional.
+
+Limit the first interface to server connection/device sign-in, a profile picker with PIN entry, a library selector and paginated poster grid, title details with Play/Resume and version choice, and season/episode selection. Include profile switching in a consistent location. Keep Kodi's normal playback OSD for pause, seek, audio, and subtitle selection. Continue Watching can follow once server resume is reliable; do not reproduce the web dashboard in the first milestone.
+
+Before release, review licenses and attribution for reused fonts, icons, and artwork, and check Silo's branding guidance. Following the visual language does not require copying the web frontend or distributing reference screenshots.
 
 ## Authentication and profile authority
 
@@ -81,10 +99,20 @@ Keep bitrate unbounded by arbitrary client defaults, while honoring server polic
 
 ## Delivery sequence and acceptance
 
-1. **Repository and target loop (this change):** installable scaffold, reproducible ZIP, SSH deployment, Kodi directory execution, silent local audio seek/pause/resume/stop, target report.
-2. **Sign-in and browsing:** browser-approved device session; restart retains sign-in; profile/PIN selection; paginated movie and TV browsing; stale navigation after a switch cannot expose the old profile. Sanitize captured fixtures before committing tests.
-3. **Original playback:** one authenticated SDR file through negotiated v3 playback; long-lived session reporting; range seeking; stop and persisted resume observed through an independent Silo client. Repeat under another profile.
-4. **Target media qualification:** HDR10, DV including FEL discrimination, and lossless audio passthrough on the powered HDMI chain. Measure sustained bitrate and establish the supported media matrix.
+1. **UX and lifecycle spike:** confirm visual references and prototype a focused poster grid/detail flow. Validate remote navigation and player return; decide the lifetime owner for Silo heartbeats before expanding the UI.
+2. **Account access:** implement device pairing, token persistence/refresh/logout, and profile/PIN selection. Browser approval is the only user credential interaction. Restart retains sign-in; failures do not accidentally change profile authority.
+3. **First real playback:** browse enough authenticated catalog data to choose one SDR movie, negotiate original delivery, and play it through Kodi. Prove range seeks, pause beyond 45 seconds, progress heartbeats, stop, and resume observed in Silo. This is the first end-to-end usable milestone.
+4. **Complete everyday browsing:** paginate libraries, navigate seasons/episodes, show artwork and details, support versions, and restore navigation state. Verify old profile navigation cannot play under stale authority. Wire these screens to the proven playback path.
+5. **Media qualification and recovery:** validate HDR10, DV/FEL, lossless soundtrack passthrough, embedded subtitles, and sustained bitrate; exercise expired tokens, network interruption, immediate stop, and file replacement. Keep hardware-specific results local.
+6. **Public release:** verify a clean ZIP install and an upgrade preserving settings and sign-in, then publish a versioned asset through GitHub Releases. State the tested Kodi and API compatibility and playback limitations.
+
+## Development and distribution
+
+Use the existing package/deploy workflow for local iteration: build the installable ZIP, transfer it over SSH, replace the add-on tree, and ask Kodi to rescan. Keep local endpoints and SSH configuration in ignored `.local-testing/`. Expand the package allowlist as XML windows, resources, and modules are added. Keep the same package builder for development and release artifacts.
+
+For GitHub Releases, add CI for syntax/manifest checks, focused contract tests, and packaging. A version tag should match `addon.xml`; a tag workflow builds `plugin.video.silo-<version>.zip` and a SHA-256 checksum, then attaches those artifacts and release notes to the release. The automatically generated repository source archive is not the installable add-on package. Begin with prereleases until real-device acceptance passes.
+
+The first distribution method is Kodi's **Install from zip file**, with manual upgrades. A Kodi repository for automatic updates is a later feature; GitHub Releases alone does not provide Kodi's update feed. Do not add an updater inside the client. No publishing or release credentials are needed to develop locally.
 
 Focused tests should distinguish these plausible failures: paging stops at 50 items; item IDs are mistaken for file IDs; a failed PIN changes active authority; stale profile entries still play; refresh races discard rotated tokens; a delayed progress report overwrites a newer seek; stop races the next session; playback is advertised before the demuxer is ready; remux loses FEL; a redirect leaks API credentials. Test public behavior and independent observations, not call order alone.
 
@@ -94,3 +122,6 @@ Focused tests should distinguish these plausible failures: paging stops at 50 it
 - [Authentication](https://github.com/Silo-Server/silo-server/blob/489fe4d55735f3855b2a0d6276e57d148891b456/docs/auth-api.md), [v2 playback](https://github.com/Silo-Server/silo-server/blob/489fe4d55735f3855b2a0d6276e57d148891b456/docs/playback-api.md), and [protocol 3](https://github.com/Silo-Server/silo-server/blob/489fe4d55735f3855b2a0d6276e57d148891b456/docs/architecture/playback-protocol-v3.md).
 - [Native API lifecycle](https://github.com/Silo-Server/silo-server/blob/489fe4d55735f3855b2a0d6276e57d148891b456/docs/architecture/api-contract.md) and [Jellyfin compatibility boundaries](https://github.com/Silo-Server/silo-server/blob/489fe4d55735f3855b2a0d6276e57d148891b456/docs/jellycompat-api.md).
 - [Kodi add-on structure](https://kodi.wiki/view/Add-on_structure); use the target's `JSONRPC.Introspect` for its RPC contract.
+
+- [Silo public UI showcase](https://siloserver.org/) and [Midnight Cinema theme](https://github.com/Silo-Server/silo-server/blob/489fe4d55735f3855b2a0d6276e57d148891b456/web/src/app.css).
+- [Kodi XML windows](https://xbmc.github.io/docs.kodi.tv/master/kodi-base/dd/d4d/group__python__xbmcgui__window__xml.html) and [GitHub Releases](https://docs.github.com/en/repositories/releasing-projects-on-github/about-releases).
