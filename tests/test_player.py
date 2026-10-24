@@ -10,9 +10,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'plugin.video.silo/
 
 
 class Lifetime(unittest.TestCase):
-    def run_playback(self, scenario):
+    def run_playback(self, scenario, source=None):
         state = SimpleNamespace(file=None, closed=False, relay_closed=False, clock=0, player=None,
-                                subtitles=[], relay_updated=False)
+                                subtitles=[], relay_updated=False, item_properties={})
         url = 'https://silo.example.test/api/v2/stream/owned'
 
         class Player:
@@ -89,10 +89,12 @@ class Lifetime(unittest.TestCase):
                 if scenario != 'readiness_timeout':
                     state.player.onAVStarted()
 
+        item = Mock()
+        item.setProperty.side_effect = state.item_properties.__setitem__
         modules = {
             'xbmc': SimpleNamespace(Player=Player, Monitor=Monitor, log=Mock(), LOGINFO=1, LOGWARNING=2,
                                     LOGERROR=3, getCondVisibility=lambda name: False),
-            'xbmcgui': SimpleNamespace(ListItem=Mock(), Dialog=Mock(), NOTIFICATION_ERROR=1),
+            'xbmcgui': SimpleNamespace(ListItem=Mock(return_value=item), Dialog=Mock(), NOTIFICATION_ERROR=1),
             'xbmcplugin': SimpleNamespace(setResolvedUrl=resolve),
         }
         path = Path(__file__).resolve().parents[1] / 'plugin.video.silo/resources/lib/silo/player.py'
@@ -104,8 +106,13 @@ class Lifetime(unittest.TestCase):
             controls.take.return_value = {'subtitle': 'track'} if scenario == 'replan_replacement' else None
             with patch.object(module, 'Attempt', Attempt), patch.object(module, 'MediaRelay', Relay), patch.object(module, 'PlaybackControls', return_value=controls), patch.object(module.time, 'monotonic', lambda: state.clock):
                 session = SimpleNamespace(store=SimpleNamespace(playback_lock=nullcontext))
-                module.play(1, session, 'profile', 'file', 'Title')
+                module.play(1, session, 'profile', 'file', 'Title', source=source)
         return state
+
+    def test_list_item_retains_plugin_identity_for_kodi_bookkeeping(self):
+        source = 'plugin://plugin.video.silo/?action=play&file=example'
+        state = self.run_playback('subtitle_error', source=source)
+        self.assertEqual(state.item_properties['original_listitem_url'], source)
 
     def test_failure_stops_owned_media_and_closes_session(self):
         for scenario in ('subtitle_error', 'readiness_timeout'):

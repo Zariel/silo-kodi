@@ -64,6 +64,10 @@ def play(handle, session, profile_id, file_id, title, start_position=None, sourc
                 xbmc.log('Silo: playback plan accepted', xbmc.LOGINFO)
                 item = xbmcgui.ListItem(label=title, path=url)
                 item.setContentLookup(False)
+                if source:
+                    # Kodi's bookmarks and file metadata belong to the plugin
+                    # route, not the temporary relay resource.
+                    item.setProperty('original_listitem_url', source)
                 mime = attempt.plan['stream'].get('mime_type')
                 if mime:
                     item.setMimeType(mime)
