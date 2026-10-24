@@ -43,8 +43,12 @@ class Catalog:
         return self.session.request('GET', path, expected_profile=self.profile_id)
 
     def libraries(self):
+        settings = self._get('/settings/values/effective', {'keys': 'ui.disabled_library_ids'})['items']
+        hidden = {str(identifier) for setting in settings if setting['key'] == 'ui.disabled_library_ids'
+                  for identifier in (setting['value'] or [])}
+        # Unrestricted viewer responses also contain self-hidden libraries.
         return [item for item in self._get('/user/libraries')['items']
-                if item.get('type') in ('movies', 'series')]
+                if item.get('type') in ('movies', 'series') and str(item['id']) not in hidden]
 
     def home(self):
         for path in ('/home/layout', '/home/sections'):
@@ -81,7 +85,8 @@ class Catalog:
                                    if item.get('type') in ('movie', 'series', 'episode')])
 
     def home_page(self, section_id, cursor=None):
-        query = {'source': 'section', 'scope': 'home', 'section_id': section_id, 'limit': 50}
+        query = {'source': 'section', 'scope': 'home', 'section_id': section_id, 'limit': 50,
+                 'skip_total': 'true'}
         if cursor is not None:
             query['cursor'] = cursor
         # Omit sort and type: preserve recipe ordering and episode cards.
@@ -92,7 +97,7 @@ class Catalog:
 
     def page(self, library_id, cursor=None):
         query = {'source': 'query', 'library_id': library_id, 'type': 'video',
-                 'sort': 'title', 'limit': 50}
+                 'sort': 'title', 'limit': 50, 'skip_total': 'true'}
         if cursor is not None:
             query['cursor'] = cursor
         result = self._get('/catalog', query)
@@ -109,9 +114,6 @@ class Catalog:
     def episodes(self, series_id, season):
         return self._get('/catalog/series/' + quote(str(series_id), safe='') + '/seasons/'
                          + quote(str(season), safe='') + '/episodes')['items']
-
-    def versions(self, content_id):
-        return self._get('/catalog/items/' + quote(str(content_id), safe='') + '/versions')['items']
 
     def watch(self, content_id):
         return self._get('/watch/' + quote(str(content_id), safe=''))

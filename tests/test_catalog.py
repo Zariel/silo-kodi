@@ -11,7 +11,7 @@ from silo.client import Error
 class Session:
     def __init__(self):
         self.profile = 'viewer'
-        self.responses = {}
+        self.responses = {'/settings/values/effective?keys=ui.disabled_library_ids': {'items': []}}
         self.requests = []
 
     def status(self):
@@ -32,6 +32,19 @@ class Session:
 
 
 class Browsing(unittest.TestCase):
+    def test_libraries_honor_effective_hidden_settings(self):
+        session = Session()
+        session.responses['/settings/values/effective?keys=ui.disabled_library_ids'] = {
+            'items': [{'key': 'ui.disabled_library_ids', 'value': ['hidden'],
+                       'requested_value': ['visible'], 'source': 'profile'}]}
+        session.responses['/user/libraries'] = {'items': [
+            {'id': 'hidden', 'type': 'movies'}, {'id': 'visible', 'type': 'series'}]}
+        self.assertEqual(Catalog(session).libraries(), [{'id': 'visible', 'type': 'series'}])
+
+        session.responses['/settings/values/effective?keys=ui.disabled_library_ids']['items'][0]['value'] = None
+        self.assertEqual(Catalog(session).libraries(), [
+            {'id': 'hidden', 'type': 'movies'}, {'id': 'visible', 'type': 'series'}])
+
     def test_home_preserves_profile_order_custom_sections_and_empty_layout(self):
         session = Session()
         rows = [{'id': 'custom', 'title': 'My picks', 'is_custom': True},
@@ -63,7 +76,7 @@ class Browsing(unittest.TestCase):
         episode = {'content_id': 'episode-1', 'type': 'episode'}
         session.responses['/home/sections/custom%2F1/items'] = {
             'id': 'custom/1', 'total_count': 9, 'items': [episode, {'type': 'ebook'}]}
-        session.responses['/catalog?source=section&scope=home&section_id=custom%2F1&limit=50&cursor=opaque%2F%2B'] = {
+        session.responses['/catalog?source=section&scope=home&section_id=custom%2F1&limit=50&skip_total=true&cursor=opaque%2F%2B'] = {
             'items': [episode, {'type': 'future'}], 'page': {'next_cursor': 'next-token'}}
         catalog = Catalog(session)
         self.assertEqual(catalog.home_section('custom/1'), {
@@ -148,10 +161,10 @@ class Browsing(unittest.TestCase):
 
     def test_cursor_survives_filtered_page(self):
         session = Session()
-        session.responses['/catalog?source=query&library_id=lib%2F1&type=video&sort=title&limit=50'] = {
+        session.responses['/catalog?source=query&library_id=lib%2F1&type=video&sort=title&limit=50&skip_total=true'] = {
             'items': [{'content_id': 'unknown', 'type': 'future'}],
             'page': {'next_cursor': 'opaque/+?='}}
-        session.responses['/catalog?source=query&library_id=lib%2F1&type=video&sort=title&limit=50&cursor=opaque%2F%2B%3F%3D'] = {
+        session.responses['/catalog?source=query&library_id=lib%2F1&type=video&sort=title&limit=50&skip_total=true&cursor=opaque%2F%2B%3F%3D'] = {
             'items': [{'content_id': 'title-1', 'type': 'movie', 'title': 'Example'}],
             'page': {'next_cursor': None}}
         catalog = Catalog(session)
@@ -165,10 +178,10 @@ class Browsing(unittest.TestCase):
     def test_content_and_file_identity_remain_distinct(self):
         session = Session()
         session.responses['/catalog/items/title%2F1'] = {'content_id': 'title/1', 'type': 'movie'}
-        session.responses['/catalog/items/title%2F1/versions'] = {'items': [{'file_id': 'file-9', 'container': 'mkv'}]}
+        session.responses['/watch/title%2F1'] = {'versions': [{'file_id': 'file-9', 'container': 'mkv'}]}
         catalog = Catalog(session)
         detail = catalog.item('title/1')
-        self.assertEqual(catalog.versions(detail['content_id']), [{'file_id': 'file-9', 'container': 'mkv'}])
+        self.assertEqual(catalog.watch(detail['content_id'])['versions'], [{'file_id': 'file-9', 'container': 'mkv'}])
 
     def test_specials_use_season_zero(self):
         session = Session()
@@ -185,7 +198,7 @@ class Browsing(unittest.TestCase):
         for operation in (catalog.libraries, catalog.home, lambda: catalog.home_section('recent'),
                           lambda: catalog.home_page('recent'), lambda: catalog.page('library'),
                           lambda: catalog.item('title'), lambda: catalog.seasons('show'),
-                          lambda: catalog.episodes('show', 1), lambda: catalog.versions('title'),
+                          lambda: catalog.episodes('show', 1),
                           lambda: catalog.watch('title')):
             with self.subTest(operation=operation), self.assertRaises(Error) as raised:
                 operation()
