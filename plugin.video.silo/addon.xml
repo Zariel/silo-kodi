@@ -8,7 +8,7 @@
   </extension>
   <extension point="xbmc.addon.metadata">
     <summary lang="en_GB">Browse and play media from Silo</summary>
-    <description lang="en_GB">Sign in using a QR code, choose a profile, browse libraries, and play supported original SDR video through Kodi. HDR, quality selection, and subtitle controls are under development.</description>
+    <description lang="en_GB">Sign in using a QR code, choose a profile, browse libraries, and play Silo-authorized video through Kodi. Includes quality and text subtitle selection. Native HDR and audio output depend on the Kodi device and configuration; playback qualification is ongoing.</description>
     <platform>all</platform>
     <license>MIT</license>
   </extension>

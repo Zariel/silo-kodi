@@ -2,7 +2,9 @@
 
 A browsing client for Silo, targeting Kodi 21 on CoreELEC. The intended client uses Silo account authentication and profiles, browses libraries on demand, and delegates media playback to Kodi without syncing the catalog into Kodi's library.
 
-**Status:** playback in validation. Version `0.3.0` provides QR sign-in, profile selection, library and detail screens, SDR video playback with Silo progress reporting, quality selection, and text subtitle selection. Representative movies, episodes, pause, resume, start-over, subtitle On/Off changes, and original/360p quality transitions work on the test device. Natural token expiry, sustained bitrate, HDR, lossless output, combined quality/subtitle workflows, and additional subtitle formats still need implementation or qualification.
+**Status:** playback in validation. Version `0.3.0` provides QR sign-in, profile selection, library and detail screens, native video playback with Silo progress reporting, quality selection, and text subtitle selection. Representative movies, episodes, pause, resume, start-over, combined subtitle/quality changes, HDR10, and Dolby Vision with receiver-confirmed TrueHD/Atmos pass short checks on the test device. Natural token expiry, sustained bitrate, broader device/output coverage, and additional subtitle formats still need qualification.
+
+Original-file presentation is delegated to Kodi, with declared codec eligibility up to 2160p. HDR, Dolby Vision/FEL, and audio passthrough depend on the device, Kodi build, and configuration. See the compatibility evidence below; these are not universal Kodi support claims.
 
 During playback, return to Silo's browser and choose **Now playing → Subtitles** to select a server-provided text track or **Off**. **Now playing → Return to video** restores fullscreen playback. Kodi's normal controls remain available for pause, seek, and audio.
 

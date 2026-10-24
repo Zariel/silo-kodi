@@ -7,27 +7,29 @@ from .client import Error
 
 
 def capabilities():
-    # This initial declaration covers SDR decode, not HDMI passthrough or HDR.
+    # Kodi owns original-file presentation. Declared decode eligibility does not
+    # attest native HDR output, passthrough, or Dolby Vision enhancement layers.
     containers = ['mkv', 'mp4', 'mov', 'avi', 'mpegts']
     video = ['h264', 'hevc', 'mpeg2video']
     audio = ['aac', 'ac3', 'eac3', 'dts', 'truehd', 'flac', 'mp3', 'pcm_s16le', 'pcm_s24le']
     decoder = {'video_evidence': 'declared', 'audio_evidence': 'declared',
                'codecs_video': video, 'codecs_video_hardware': [], 'codecs_audio': audio, 'containers': containers,
-               'max_resolution': '1080p', 'hdr': False}
+               'max_resolution': '2160p', 'hdr': False}
     context = {'protocol_version': 3, 'form_factor': 'tv', 'app_version': '0.3.0',
                'device': {'platform': 'linux', 'model': 'Kodi'},
-               'output': {'output_context_id': 'kodi-sdr'},
+               'output': {'output_context_id': 'kodi-native'},
                'deliveries': {'original_http': {
                    'enabled': True, 'supported_on_device': True, 'containers': containers,
                    'video_codecs': video, 'audio_decode_codecs': audio,
                    'audio_passthrough_codecs': [], 'auth_header_refresh': False,
-                   'features': [], 'validated_claims': [], 'transformations': [],
+                   'features': [], 'validated_claims': ['client_managed_dynamic_range_v1'], 'transformations': [],
                    'subtitles': {'embedded_text': True, 'sidecar_text': True,
                                  'ass_styling': False, 'embedded_bitmap': False,
                                  'sidecar_bitmap': False, 'font_attachments': False}}}}
     context['deliveries']['hls'] = dict(context['deliveries']['original_http'],
                                       containers=['hls'], video_codecs=['h264'],
-                                      audio_decode_codecs=['aac'], max_channels=2)
+                                      audio_decode_codecs=['aac'], max_channels=2,
+                                      validated_claims=[])
     return decoder, context
 
 

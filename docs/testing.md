@@ -1,6 +1,6 @@
 # Test on CoreELEC
 
-Use the development loop below to validate code through the actual Kodi interpreter and player. The client provides library and detail screens, account authentication, and initial original SDR playback. The playback smoke test uses a chosen Silo video through the installed add-on.
+Use the development loop below to validate code through the actual Kodi interpreter and player. The client provides library and detail screens, account authentication, and native original playback. The playback smoke test uses a chosen Silo video through the installed add-on.
 
 ## Prerequisites
 
@@ -64,7 +64,7 @@ Before sharing logs after authentication is implemented, redact signed stream UR
 
 After signing in and choosing a profile, open Silo to show the first video library. Use the left navigation to change library or open **Account**. Moving right returns to the content selection. Choose a poster to open its details, a season to show episodes, and an episode to show its details. **Back** restores the preceding screen and selection.
 
-Scroll to **Load more** after the first 50 titles and select it. Verify that another page appears and focus remains at the first appended card. Open that card and go Back; the loaded page and selection must remain. Empty libraries and unavailable artwork must not prevent navigation. **Play** requests an original stream; the initial decoder declaration is limited to SDR at up to 1080p. This is an implementation boundary, not the hardware's maximum capability.
+Scroll to **Load more** after the first 50 titles and select it. Verify that another page appears and focus remains at the first appended card. Open that card and go Back; the loaded page and selection must remain. Empty libraries and unavailable artwork must not prevent navigation. **Play** negotiates media with Silo; original-file presentation is delegated to Kodi with declared codec eligibility up to 2160p. Confirm actual HDR/audio output on the target instead of inferring it from source badges or a successful start.
 
 Switch profiles through **Account** and return to browsing. The client must rebuild the library root for the selected profile rather than restore the previous profile's history. Screenshots and private catalog evidence belong in ignored local storage.
 

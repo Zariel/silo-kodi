@@ -52,6 +52,20 @@ class Server:
 
 
 class Playback(unittest.TestCase):
+    def test_original_presentation_is_delegated_without_claiming_sink_formats(self):
+        server = Server()
+        attempt = Attempt(server, 'viewer', 'file-7')
+        attempt.start()
+        body = next(body for _, path, body in server.calls if path == '/playback/start')
+        decoder = body['client_capabilities']
+        deliveries = body['client_playback_context']['deliveries']
+        self.assertEqual(decoder['max_resolution'], '2160p')
+        self.assertEqual(decoder['audio_evidence'], 'declared')
+        self.assertFalse(decoder['hdr'])
+        self.assertIn('client_managed_dynamic_range_v1', deliveries['original_http']['validated_claims'])
+        self.assertNotIn('client_managed_dynamic_range_v1', deliveries['hls']['validated_claims'])
+        self.assertEqual(deliveries['original_http']['audio_passthrough_codecs'], [])
+
     @patch('silo.playback.time.sleep')
     def test_quality_replans_preserve_tracks_and_intent(self, sleep):
         server = Server()
