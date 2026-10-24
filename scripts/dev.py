@@ -41,9 +41,11 @@ def package_files():
     return sorted(files)
 
 
-def package():
+def package(release_tag=None):
     check()
     version = ET.parse(ADDON / "addon.xml").getroot().attrib["version"]
+    if release_tag is not None and release_tag != 'v' + version:
+        raise SystemExit('Release tag must match addon.xml: v' + version)
     output = ROOT / "dist" / "{}-{}.zip".format(ADDON_ID, version)
     output.parent.mkdir(exist_ok=True)
     # An explicit allowlist keeps scratch files and credentials out of releases.
@@ -53,6 +55,8 @@ def package():
             info = zipfile.ZipInfo(ADDON_ID + "/" + name, (2026, 1, 1, 0, 0, 0))
             info.external_attr = 0o644 << 16
             archive.writestr(info, path.read_bytes(), zipfile.ZIP_DEFLATED)
+    digest = hashlib.sha256(output.read_bytes()).hexdigest()
+    output.with_suffix('.zip.sha256').write_text(digest + '  ' + output.name + '\n')
     print(output.relative_to(ROOT))
     return output
 
@@ -252,6 +256,7 @@ def main():
     parser.add_argument("--ssh", default=os.environ.get("SILO_SSH_TARGET"))
     parser.add_argument("--rpc", default=os.environ.get("SILO_RPC_URL"))
     parser.add_argument("--server", default=os.environ.get("SILO_SERVER_URL"))
+    parser.add_argument("--release-tag", help="Require the package version to match this v-prefixed release tag")
     args = parser.parse_args()
     required = []
     if args.command not in ("check", "package"):
@@ -267,7 +272,7 @@ def main():
         check()
         subprocess.run([sys.executable, "-m", "unittest", "discover", "-s", "tests", "-v"], cwd=ROOT, check=True)
     elif args.command == "package":
-        package()
+        package(args.release_tag)
     else:
         {"deploy": deploy, "probe": probe, "browse": browse, "smoke": smoke}[args.command](args)
 
