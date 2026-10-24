@@ -28,3 +28,7 @@ The workflow does not publish a release itself. Publishing the release triggers 
 The **Check and package** workflow also runs on pull requests and pushes to `main`. Its downloadable artifact wraps the add-on ZIP and checksum; extract that wrapper before installing the add-on ZIP in Kodi. Local checks and workflow linting do not prove that a workflow has run successfully on GitHub.
 
 GitHub Releases provide manual downloads. This project does not yet publish a Kodi repository feed for automatic updates.
+
+## Verified packaging evidence
+
+The [Check and package run for revision 2b87fffb](https://github.com/Zariel/silo-kodi/actions/runs/40118604371) succeeded. Its downloaded add-on ZIP matches the local version `0.3.0` ZIP byte-for-byte, and independent hashes of every installed package file match that archive. The checksum is verified; a matching release tag reproduces the ZIP, while a mismatched tag fails without replacing it. Later changes to tests and documentation do not change the packaged add-on files. This verifies GitHub CI artifact generation, not publication or asset attachment by the release-triggered workflow.
