@@ -147,3 +147,11 @@ This is the acceptance procedure for the complete client, not a claim that the d
 6. Exercise denied/expired profile authority, network loss, playback failure before readiness, immediate stop, and replacement by another item. Verify no duplicate sessions or cross-profile progress. Do not change output settings or the server to hide a failure.
 
 Store fixture identifiers and private measurements in `.scratch/`. Keep deployment-specific target reports in ignored `.local-testing/`. Commit only generic supported limits and sanitized test fixtures. The eventual capability declaration must be no broader than these results.
+
+## Home acceptance
+
+Open the add-on after profile selection. Home must be the initial page, with visible row titles in the profile's server order and the configured accent. Move horizontally to a nonfirst card, open details, and return: the same content must regain focus even if refreshing the row changes its position. If that card disappears, focus must remain on a valid card. Move down beyond the second row and back up; empty rows must not trap navigation.
+
+Choose **View all**, open a title, then return through the section to Home. Verify focus returns to **View all**. In a section with more than 50 cards, use **Load more** and verify the server cursor supplies additional cards without resetting selection. Switch to a library and back to Home through the sidebar. Verify an empty Home leaves library navigation accessible.
+
+After playback, verify Continue Watching reflects the server's updated progress. Switch profiles and verify the previous profile's rows are not retained. Exercise unavailable layout support separately from authentication and network failures: only unsupported endpoints permit compatibility fallback. Keep screenshots brief and verify idle display protection after closing the browser.

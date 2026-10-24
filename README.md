@@ -2,9 +2,11 @@
 
 A browsing client for Silo, targeting Kodi 21 on CoreELEC. The intended client uses Silo account authentication and profiles, browses libraries on demand, and delegates media playback to Kodi without syncing the catalog into Kodi's library.
 
-**Status:** playback in validation. Version `0.3.0` provides QR sign-in, profile selection, library and detail screens, native video playback with Silo progress reporting, quality selection, and text/embedded PGS subtitle selection. Representative movies, episodes, pause, resume, start-over, combined subtitle/quality changes, HDR10, and Dolby Vision with receiver-confirmed TrueHD/Atmos pass short checks on the test device. A ten-minute high-bitrate playback check passes sampled clock and buffering checks. Natural token expiry, broader bitrate/output coverage, and additional subtitle formats still need qualification.
+**Status:** playback in validation. Version `0.3.0` provides QR sign-in, profile selection, Home, library and detail screens, native video playback with Silo progress reporting, quality selection, and text/embedded PGS subtitle selection. Representative movies, episodes, pause, resume, start-over, combined subtitle/quality changes, HDR10, and Dolby Vision with receiver-confirmed TrueHD/Atmos pass short checks on the test device. A ten-minute high-bitrate playback check passes sampled clock and buffering checks. Natural token expiry, broader bitrate/output coverage, and additional subtitle formats still need qualification.
 
 Original-file presentation is delegated to Kodi, with declared codec eligibility up to 2160p. HDR, Dolby Vision/FEL, and audio passthrough depend on the device, Kodi build, and configuration. See the compatibility evidence below; these are not universal Kodi support claims.
+
+Home opens after profile selection and shows server-ordered rows using your configured accent. Use **View all** to browse a section, or choose a library from the sidebar. Returning from details refreshes the visible rows and retains the selected card when it still exists.
 
 The [six-milestone delivery plan](docs/design.md#delivery-sequence-and-acceptance) includes making Silo Home the main page after playback quality and subtitles, using server-provided sections and ordering with a default-order compatibility fallback.
 
