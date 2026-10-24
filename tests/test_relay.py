@@ -154,7 +154,8 @@ class Transport(unittest.TestCase):
         self.assertEqual([path for path, _ in self.origin.requests], ['/redirect'])
         with self.assertRaises(HTTPError) as raised:
             urlopen(self.relay.url('video') + '?url=https://other.example.test', timeout=3)
-        self.assertEqual(raised.exception.code, 404)
+        with raised.exception as response:
+            self.assertEqual(response.code, 404)
         self.assertEqual(len(self.origin.requests), 1)
 
     def test_truncated_response_is_not_reported_as_complete(self):
