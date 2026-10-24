@@ -35,7 +35,7 @@ def _owns(player, url, source):
     return player.getPlayingFile().split('|', 1)[0] in (url.split('|', 1)[0], source)
 
 
-def play(handle, session, profile_id, file_id, title, start_position=None, source=None):
+def play(handle, session, profile_id, file_id, title, start_position=None, source=None, subtitle_track_id=None):
     attempt = None
     resolved = False
     last_position = None
@@ -46,7 +46,7 @@ def play(handle, session, profile_id, file_id, title, start_position=None, sourc
     try:
         with session.store.playback_lock():
             try:
-                attempt = Attempt(session, profile_id, file_id, start_position)
+                attempt = Attempt(session, profile_id, file_id, start_position, subtitle_track_id=subtitle_track_id)
                 url = attempt.start()
                 xbmc.log('Silo: playback plan accepted', xbmc.LOGINFO)
                 item = xbmcgui.ListItem(label=title, path=url)
@@ -82,10 +82,6 @@ def play(handle, session, profile_id, file_id, title, start_position=None, sourc
                         paused = xbmc.getCondVisibility('Player.Paused')
                     except RuntimeError:
                         break
-                    if not tracks_applied:
-                        if attempt.plan.get('subtitle', {}).get('mode') == 'off':
-                            player.showSubtitles(False)
-                        tracks_applied = True
                     if resume_pending:
                         if abs(position - start) <= 10:
                             resume_pending = False
@@ -99,6 +95,13 @@ def play(handle, session, profile_id, file_id, title, start_position=None, sourc
                         if resume_pending:
                             monitor.waitForAbort(.25)
                             continue
+                    if not tracks_applied:
+                        if attempt.subtitle_url:
+                            player.setSubtitles(attempt.subtitle_url)
+                            player.showSubtitles(True)
+                        else:
+                            player.showSubtitles(False)
+                        tracks_applied = True
                     last_position = position
                     if time.monotonic() >= next_report:
                         try:

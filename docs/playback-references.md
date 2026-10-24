@@ -37,4 +37,5 @@ This is a validation matrix, not a release support guarantee. Deployment-specifi
 | DTS-HD MA, TrueHD, Atmos | No end-to-end output qualification; decoder/stream labels do not prove AVR output |
 | Sustained bitrate | Short range reads measured; long playback across bitrate peaks remains |
 | Media credential rotation | API refresh works; native media reopening with fresh credentials remains |
-| Quality and subtitles | Not implemented; preserve server policy rather than invent unsupported routes |
+| Text subtitles | Authenticated server-selected WebVTT sidecar loads and displays captions after a seek; SRT accepted but not yet device-qualified |
+| Quality and subtitle controls | Selection UI, quality replans, native embedded identity mapping, ASS/fonts, and bitmap paths remain |

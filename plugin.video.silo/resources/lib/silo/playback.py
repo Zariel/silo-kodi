@@ -23,8 +23,8 @@ def capabilities():
                    'audio_passthrough_codecs': [], 'auth_header_refresh': False,
                    'features': [], 'validated_claims': [], 'transformations': [],
                    'subtitles': {'embedded_text': True, 'sidecar_text': True,
-                                 'ass_styling': True, 'embedded_bitmap': True,
-                                 'sidecar_bitmap': False, 'font_attachments': True}}}}
+                                 'ass_styling': False, 'embedded_bitmap': False,
+                                 'sidecar_bitmap': False, 'font_attachments': False}}}}
     return decoder, context
 
 
@@ -49,8 +49,22 @@ def media_url(server, stream, authority=None):
         raise Error('unsupported_playback') from None
 
 
+def subtitle_url(server, decision, authority):
+    if decision.get('mode') == 'off':
+        return None
+    artifact = decision.get('artifact') or {}
+    # Original media and its sidecar both use the source clock. Other timelines
+    # need an explicit mapping rather than silently displaying shifted cues.
+    if (decision.get('mode') not in ('render', 'convert')
+            or artifact.get('format') not in ('srt', 'vtt', 'webvtt')
+            or artifact.get('timing_origin_seconds') != 0
+            or decision.get('embedded') or decision.get('hls_rendition')):
+        raise Error('unsupported_playback')
+    return media_url(server, artifact, authority)
+
+
 class Attempt:
-    def __init__(self, session, profile_id, file_id, start_position=None):
+    def __init__(self, session, profile_id, file_id, start_position=None, subtitle_track_id=None):
         self.session = session
         self.profile_id = profile_id
         self.session_id = None
@@ -58,6 +72,7 @@ class Attempt:
         self.last_sample = None
         self.stop_body = None
         self.plan = None
+        self.subtitle_url = None
         self.ended = False
         capability = self._request('GET', '/playback/capabilities')
         if not capability.get('allowed') or 3 not in capability.get('protocol_versions', []):
@@ -75,6 +90,8 @@ class Attempt:
             self.body['client_features'].append('header_authenticated_media_v1')
         if start_position is not None:
             self.body['start_position'] = start_position
+        if subtitle_track_id is not None:
+            self.body['subtitle_track_id'] = subtitle_track_id
 
     def _request(self, method, path, body=None):
         return self.session.request(method, path, body, expected_profile=self.profile_id)
@@ -100,7 +117,9 @@ class Attempt:
                 or self.plan.get('stream', {}).get('header_refresh') not in ('none', None)
                 or not self.plan.get('timeline', {}).get('can_seek_anywhere')):
             raise Error('unsupported_playback')
-        return media_url(self.session.server, self.plan['stream'], self.session.media_headers(self.profile_id))
+        authority = self.session.media_headers(self.profile_id)
+        self.subtitle_url = subtitle_url(self.session.server, self.plan.get('subtitle', {'mode': 'off'}), authority)
+        return media_url(self.session.server, self.plan['stream'], authority)
 
     def sample(self, position, paused):
         if self.ended:

@@ -66,6 +66,8 @@ Switch profiles through **Account** and return to browsing. The client must rebu
 
 When Silo reports a saved position, **Play** offers **Resume from …** and **Play from beginning**. Resume leaves position selection to Silo's playback plan; starting over explicitly requests position zero. Canceling the menu must not start a session. Check the actual player clock after either choice, then stop and verify that the same detail screen returns with **Play** focused.
 
+For subtitle acceptance, the `action=play` plugin route accepts an optional `subtitle` query parameter containing a `track_id` from Silo's subtitle inventory. Pass that identity unchanged; a Kodi subtitle index is not interchangeable with it. Omitting the parameter leaves selection to Silo. The playback owner applies supported text sidecars after startup seeking, or hides subtitles when Silo returns Off. Verify Kodi selects the added sidecar, inspect visible captions after seeking, then play again with an Off decision and check that the previous selection does not leak. The remote selection UI and other subtitle delivery modes remain unfinished.
+
 ## Test authentication without the TV
 
 The packaged `auth.py` helper uses the same implementation and protected credential store as the account screen. Run it on the target over SSH to keep tokens on the device:

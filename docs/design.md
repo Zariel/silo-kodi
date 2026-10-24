@@ -90,7 +90,7 @@ A device capability assertion is a promise, not a wish list. Initially support o
 
 For a playable original plan, use the returned stream URL and required media headers with `xbmcplugin.setResolvedUrl`. Preserve signed URL parameters. Keep account credentials on the API origin; handle server-issued delivery grants according to the plan rather than forwarding bearer credentials indiscriminately to proxies. Verify Kodi forwards the required headers on initial reads and byte-range seeks. Do not require InputStream Adaptive for ordinary HTTP original files.
 
-Kodi should select embedded audio/subtitle tracks from the unchanged container. Verify server-selected track defaults map to Kodi's actual stream indexes. Do not invent index equivalence. External subtitles and persistence of track choices are follow-up work if needed to make the requested media usable.
+Kodi should select embedded audio/subtitle tracks from the unchanged container once server track identities can be mapped to Kodi's actual stream indexes. Do not invent index equivalence. The implemented subtitle path accepts server-selected SRT or WebVTT sidecars for original media, attaches current profile authority, and applies the sidecar after startup seeking settles. Both use the source clock; nonzero artifact timing origins are rejected until timeline mapping is implemented. An Off decision hides subtitles. Native embedded selection, authored ASS/fonts, bitmap subtitles, the selection UI, and persistence of track choices remain to be implemented and qualified.
 
 ### Session lifetime
 

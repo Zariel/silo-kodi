@@ -23,7 +23,8 @@ def main():
         session = Session.open(directory)
         if session and all(key in query for key in ('profile', 'file')):
             play(handle, session, query['profile'][0], query['file'][0], query.get('title', ['Silo'])[0],
-                 0 if query.get('restart') == ['true'] else None, sys.argv[0] + sys.argv[2])
+                 0 if query.get('restart') == ['true'] else None, sys.argv[0] + sys.argv[2],
+                 subtitle_track_id=query.get('subtitle', [None])[0])
         else:
             xbmcplugin.setResolvedUrl(handle, False, xbmcgui.ListItem())
         return
