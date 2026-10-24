@@ -18,6 +18,7 @@ class _Player(xbmc.Player):
 
     def onAVStarted(self):
         self.ready = True
+        xbmc.log('Silo: audio/video ready', xbmc.LOGINFO)
 
     def onPlayBackStopped(self):
         self.finished = True
@@ -47,6 +48,7 @@ def play(handle, session, profile_id, file_id, title, start_position=None, sourc
             try:
                 attempt = Attempt(session, profile_id, file_id, start_position)
                 url = attempt.start()
+                xbmc.log('Silo: playback plan accepted', xbmc.LOGINFO)
                 item = xbmcgui.ListItem(label=title, path=url)
                 item.setContentLookup(False)
                 mime = attempt.plan['stream'].get('mime_type')
@@ -65,6 +67,7 @@ def play(handle, session, profile_id, file_id, title, start_position=None, sourc
                 while not monitor.abortRequested() and not player.finished:
                     if not player.ready:
                         if time.monotonic() > deadline:
+                            xbmc.log('Silo: player readiness timed out', xbmc.LOGWARNING)
                             break
                         monitor.waitForAbort(.25)
                         continue
@@ -113,7 +116,9 @@ def play(handle, session, profile_id, file_id, title, start_position=None, sourc
             finally:
                 if attempt:
                     try:
+                        xbmc.log('Silo: closing playback session', xbmc.LOGINFO)
                         attempt.stop(last_position, paused)
+                        xbmc.log('Silo: playback session closed', xbmc.LOGINFO)
                     except Error:
                         xbmc.log('Silo: could not confirm playback cleanup; server expiry will reclaim the session', xbmc.LOGWARNING)
     except Error as exc:
