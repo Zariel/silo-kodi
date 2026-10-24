@@ -64,6 +64,8 @@ Scroll to **Load more** after the first 50 titles and select it. Verify that ano
 
 Switch profiles through **Account** and return to browsing. The client must rebuild the library root for the selected profile rather than restore the previous profile's history. Screenshots and private catalog evidence belong in ignored local storage.
 
+When Silo reports a saved position, **Play** offers **Resume from …** and **Play from beginning**. Resume leaves position selection to Silo's playback plan; starting over explicitly requests position zero. Canceling the menu must not start a session. Check the actual player clock after either choice, then stop and verify that the same detail screen returns with **Play** focused.
+
 ## Test authentication without the TV
 
 The packaged `auth.py` helper uses the same implementation and protected credential store as the account screen. Run it on the target over SSH to keep tokens on the device:

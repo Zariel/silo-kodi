@@ -76,7 +76,8 @@ class Browsing(unittest.TestCase):
         session.profile = 'other'
         for operation in (catalog.libraries, lambda: catalog.page('library'),
                           lambda: catalog.item('title'), lambda: catalog.seasons('show'),
-                          lambda: catalog.episodes('show', 1), lambda: catalog.versions('title')):
+                          lambda: catalog.episodes('show', 1), lambda: catalog.versions('title'),
+                          lambda: catalog.watch('title')):
             with self.subTest(operation=operation), self.assertRaises(Error) as raised:
                 operation()
             self.assertEqual(raised.exception.code, 'profile_changed')

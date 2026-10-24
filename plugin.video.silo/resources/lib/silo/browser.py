@@ -218,8 +218,24 @@ class BrowserWindow(xbmcgui.WindowXML):
             index = xbmcgui.Dialog().select('Choose version', labels)
         if index < 0 or self.closed.is_set():
             return
+        watch = self.catalog.watch(data['content_id']).get('user_data') or {}
+        position = watch.get('position_seconds') or 0
+        restart = False
+        if position > 0 and not watch.get('played'):
+            if self.closed.is_set():
+                return
+            seconds = int(position)
+            stamp = '{}:{:02d}:{:02d}'.format(seconds // 3600, seconds // 60 % 60, seconds % 60)
+            choice = xbmcgui.Dialog().contextmenu(['Resume from ' + stamp, 'Play from beginning'])
+            if choice < 0:
+                return
+            restart = choice == 1
+        if self.closed.is_set():
+            return
         query = {'action': 'play', 'profile': self.catalog.profile_id,
                  'file': versions[index]['file_id'], 'title': data.get('title') or 'Silo'}
+        if restart:
+            query['restart'] = 'true'
         self._remember()
         xbmc.Player().play('plugin://plugin.video.silo/?' + urlencode(query))
 

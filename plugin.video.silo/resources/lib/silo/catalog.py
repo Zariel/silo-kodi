@@ -57,3 +57,6 @@ class Catalog:
 
     def versions(self, content_id):
         return self._get('/catalog/items/' + quote(str(content_id), safe='') + '/versions')['items']
+
+    def watch(self, content_id):
+        return self._get('/watch/' + quote(str(content_id), safe=''))

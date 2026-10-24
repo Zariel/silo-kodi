@@ -6,6 +6,7 @@ A browsing client for Silo, targeting Kodi 21 on CoreELEC. The intended client u
 
 - [Minimal client design](docs/design.md)
 - [Development and target test loop](docs/testing.md)
+- [Playback references and compatibility status](docs/playback-references.md)
 - [Contributor guidance](AGENTS.md)
 
 ```sh
