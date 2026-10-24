@@ -88,6 +88,7 @@ class Browsing(unittest.TestCase):
         self.assertEqual(artwork('https://silo.example.test', 'https://images.example.test/poster?sig=grant'),
                          'https://images.example.test/poster?sig=grant')
         for value in (None, '', 'file:///etc/passwd', 'http://example.test/art',
-                      'https://user:password@example.test/art', '/art|Authorization=secret'):
+                      'https://user:password@example.test/art', '/art|Authorization=secret',
+                      'https://[invalid/art'):
             with self.subTest(value=value):
                 self.assertEqual(artwork('https://silo.example.test', value), '')

@@ -39,8 +39,8 @@ def main():
         return
     if handle >= 0:
         xbmcplugin.endOfDirectory(handle, cacheToDisc=False)
-    from silo.ui import open_account
-    open_account()
+    from silo.browser import open_browser
+    open_browser()
 
 
 if __name__ == '__main__':

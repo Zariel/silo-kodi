@@ -1,6 +1,6 @@
 # Test on CoreELEC
 
-Use the development loop below to validate code through the actual Kodi interpreter and player. The authentication build provides a Kodi account screen and a headless helper using the same credential store and API client. Browsing and Silo media playback remain unimplemented; the player smoke test uses a temporary local silent WAV.
+Use the development loop below to validate code through the actual Kodi interpreter and player. The browsing build provides library grids and detail screens, a Kodi account screen, and a headless helper using the same credential store and API client. Silo media playback remains unimplemented; the player smoke test uses a temporary local silent WAV.
 
 ## Prerequisites
 
@@ -55,6 +55,14 @@ ssh $SILO_SSH_OPTIONS "$SILO_SSH_TARGET" 'tail -n 150 /storage/.kodi/temp/kodi.l
 ```
 
 Before sharing logs after authentication is implemented, redact signed stream URLs, tokens, pairing codes, and private titles. Do not enable verbose HTTP logging as a routine test setting.
+
+## Check browsing with the remote
+
+After signing in and choosing a profile, open Silo to show the first video library. Use the left navigation to change library or open **Account**. Moving right returns to the content selection. Choose a poster to open its details, a season to show episodes, and an episode to show its details. **Back** restores the preceding screen and selection.
+
+Scroll to **Load more** after the first 50 titles and select it. Verify that another page appears and focus remains at the first appended card. Open that card and go Back; the loaded page and selection must remain. Empty libraries and unavailable artwork must not prevent navigation. The **Play** button is disabled in the browsing build.
+
+Switch profiles through **Account** and return to browsing. The client must rebuild the library root for the selected profile rather than restore the previous profile's history. Screenshots and private catalog evidence belong in ignored local storage.
 
 ## Test authentication without the TV
 

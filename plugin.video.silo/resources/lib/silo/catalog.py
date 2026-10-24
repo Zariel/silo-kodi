@@ -7,8 +7,11 @@ from .client import Error
 def artwork(server, value):
     if not isinstance(value, str) or not value or any(c in value for c in ('|', '\r', '\n')):
         return ''
-    url = urljoin(server.rstrip('/') + '/', value)
-    parts = urlsplit(url)
+    try:
+        url = urljoin(server.rstrip('/') + '/', value)
+        parts = urlsplit(url)
+    except ValueError:
+        return ''
     if parts.scheme != 'https' or not parts.hostname or parts.username or parts.password:
         return ''
     # Signed artwork grants carry their own authority; never append account headers.

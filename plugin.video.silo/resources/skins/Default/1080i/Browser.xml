@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<window>
+  <defaultcontrol always="true">100</defaultcontrol>
+  <controls>
+    <control type="image"><left>0</left><top>0</top><width>1920</width><height>1080</height><texture colordiffuse="FF101014">white.png</texture></control>
+    <control type="image" id="30"><left>360</left><top>0</top><width>1560</width><height>1080</height><aspectratio>scale</aspectratio><colordiffuse>44FFFFFF</colordiffuse></control>
+    <control type="image"><left>0</left><top>0</top><width>350</width><height>1080</height><texture colordiffuse="EE151519">white.png</texture></control>
+    <control type="image"><left>65</left><top>85</top><width>5</width><height>58</height><texture colordiffuse="$INFO[Window.Property(accent)]">white.png</texture></control>
+    <control type="label"><left>90</left><top>80</top><width>240</width><height>70</height><font>font45</font><textcolor>FFE8E8EC</textcolor><label>Silo</label></control>
+    <control type="label" id="11"><left>65</left><top>170</top><width>250</width><height>50</height><font>font20</font><textcolor>FFA4A4AE</textcolor></control>
+    <control type="label" id="12"><left>410</left><top>75</top><width>1400</width><height>90</height><font>font45</font><textcolor>FFFFFFFF</textcolor></control>
+    <control type="label" id="20"><left>410</left><top>1000</top><width>1410</width><height>50</height><font>font20</font><textcolor>FFE8E8EC</textcolor></control>
+    <control type="label" id="21"><left>750</left><top>190</top><width>1060</width><height>55</height><font>font20</font><textcolor>FFD0D0DA</textcolor></control>
+    <control type="textbox" id="22"><left>750</left><top>260</top><width>1060</width><height>210</height><font>font25</font><textcolor>FFE8E8EC</textcolor></control>
+    <control type="image" id="31"><left>410</left><top>210</top><width>280</width><height>420</height><aspectratio>keep</aspectratio></control>
+    <control type="list" id="100">
+      <left>50</left><top>280</top><width>280</width><height>640</height>
+      <onleft>100</onleft><onright>200</onright><onup>100</onup><ondown>100</ondown>
+      <itemlayout width="280" height="82">
+        <control type="label"><left>20</left><top>0</top><width>240</width><height>75</height><font>font25</font><textcolor>FFC4C4CE</textcolor><label>$INFO[ListItem.Label]</label></control>
+      </itemlayout>
+      <focusedlayout width="280" height="82">
+        <control type="image"><left>0</left><top>2</top><width>280</width><height>72</height><texture colordiffuse="FF303038">white.png</texture></control>
+        <control type="image"><left>0</left><top>2</top><width>4</width><height>72</height><texture colordiffuse="$INFO[Window.Property(accent)]">white.png</texture></control>
+        <control type="label"><left>20</left><top>0</top><width>240</width><height>75</height><font>font25</font><textcolor>FFFFFFFF</textcolor><label>$INFO[ListItem.Label]</label></control>
+      </focusedlayout>
+    </control>
+    <control type="panel" id="200">
+      <left>400</left><top>190</top><width>1440</width><height>780</height><orientation>vertical</orientation>
+      <onleft>100</onleft><onright>200</onright><onup>200</onup><ondown>200</ondown>
+      <visible>String.IsEqual(Window.Property(view),library)</visible>
+      <itemlayout width="240" height="390">
+        <control type="image"><left>10</left><top>8</top><width>215</width><height>310</height><texture colordiffuse="FF24242C">white.png</texture></control>
+        <control type="image"><left>10</left><top>8</top><width>215</width><height>310</height><texture>$INFO[ListItem.Art(poster)]</texture><aspectratio>scale</aspectratio></control>
+        <control type="label"><left>12</left><top>322</top><width>215</width><height>34</height><font>font20</font><textcolor>FFE8E8EC</textcolor><label>$INFO[ListItem.Label]</label></control>
+        <control type="label"><left>12</left><top>357</top><width>215</width><height>28</height><font>font20</font><textcolor>FFA4A4AE</textcolor><label>$INFO[ListItem.Property(meta)]</label></control>
+      </itemlayout>
+      <focusedlayout width="240" height="390">
+        <control type="image"><left>5</left><top>3</top><width>225</width><height>320</height><texture colordiffuse="FFFFFFFF">white.png</texture></control>
+        <control type="image"><left>10</left><top>8</top><width>215</width><height>310</height><texture colordiffuse="FF24242C">white.png</texture></control>
+        <control type="image"><left>10</left><top>8</top><width>215</width><height>310</height><texture>$INFO[ListItem.Art(poster)]</texture><aspectratio>scale</aspectratio></control>
+        <control type="label"><left>12</left><top>322</top><width>215</width><height>34</height><font>font20</font><textcolor>FFFFFFFF</textcolor><label>$INFO[ListItem.Label]</label><scroll>true</scroll></control>
+        <control type="label"><left>12</left><top>357</top><width>215</width><height>28</height><font>font20</font><textcolor>FFD0D0DA</textcolor><label>$INFO[ListItem.Property(meta)]</label></control>
+      </focusedlayout>
+    </control>
+    <control type="fixedlist" id="210">
+      <left>740</left><top>510</top><width>1080</width><height>440</height><orientation>horizontal</orientation><focusposition>0</focusposition>
+      <onleft>100</onleft><onright>210</onright><onup>301</onup><ondown>301</ondown>
+      <visible>String.IsEqual(Window.Property(view),item)</visible>
+      <itemlayout width="240" height="430">
+        <control type="image"><left>10</left><top>8</top><width>215</width><height>310</height><texture colordiffuse="FF24242C">white.png</texture></control>
+        <control type="image"><left>10</left><top>8</top><width>215</width><height>310</height><texture>$INFO[ListItem.Art(poster)]</texture><aspectratio>scale</aspectratio></control>
+        <control type="label"><left>12</left><top>330</top><width>215</width><height>40</height><font>font25</font><textcolor>FFE8E8EC</textcolor><label>$INFO[ListItem.Label]</label></control>
+        <control type="label"><left>12</left><top>375</top><width>215</width><height>35</height><font>font20</font><textcolor>FFA4A4AE</textcolor><label>$INFO[ListItem.Property(meta)]</label></control>
+      </itemlayout>
+      <focusedlayout width="240" height="430">
+        <control type="image"><left>5</left><top>3</top><width>225</width><height>320</height><texture colordiffuse="FFFFFFFF">white.png</texture></control>
+        <control type="image"><left>10</left><top>8</top><width>215</width><height>310</height><texture colordiffuse="FF24242C">white.png</texture></control>
+        <control type="image"><left>10</left><top>8</top><width>215</width><height>310</height><texture>$INFO[ListItem.Art(poster)]</texture><aspectratio>scale</aspectratio></control>
+        <control type="label"><left>12</left><top>330</top><width>215</width><height>40</height><font>font25</font><textcolor>FFFFFFFF</textcolor><label>$INFO[ListItem.Label]</label></control>
+        <control type="label"><left>12</left><top>375</top><width>215</width><height>35</height><font>font20</font><textcolor>FFD0D0DA</textcolor><label>$INFO[ListItem.Property(meta)]</label></control>
+      </focusedlayout>
+    </control>
+    <control type="list" id="220">
+      <left>740</left><top>500</top><width>1080</width><height>470</height>
+      <onleft>100</onleft><onright>220</onright><onup>301</onup><ondown>301</ondown>
+      <visible>String.IsEqual(Window.Property(view),season)</visible>
+      <itemlayout width="1080" height="155">
+        <control type="image"><left>10</left><top>5</top><width>250</width><height>140</height><texture colordiffuse="FF24242C">white.png</texture></control>
+        <control type="image"><left>10</left><top>5</top><width>250</width><height>140</height><texture>$INFO[ListItem.Art(poster)]</texture><aspectratio>scale</aspectratio></control>
+        <control type="label"><left>285</left><top>5</top><width>760</width><height>45</height><font>font25</font><textcolor>FFE8E8EC</textcolor><label>$INFO[ListItem.Label]</label></control>
+        <control type="textbox"><left>285</left><top>55</top><width>760</width><height>80</height><font>font20</font><textcolor>FFB4B4BE</textcolor><label>$INFO[ListItem.Property(summary)]</label></control>
+      </itemlayout>
+      <focusedlayout width="1080" height="155">
+        <control type="image"><left>0</left><top>0</top><width>1070</width><height>150</height><texture colordiffuse="FF34343C">white.png</texture></control>
+        <control type="image"><left>5</left><top>0</top><width>260</width><height>150</height><texture colordiffuse="FFFFFFFF">white.png</texture></control>
+        <control type="image"><left>10</left><top>5</top><width>250</width><height>140</height><texture colordiffuse="FF24242C">white.png</texture></control>
+        <control type="image"><left>10</left><top>5</top><width>250</width><height>140</height><texture>$INFO[ListItem.Art(poster)]</texture><aspectratio>scale</aspectratio></control>
+        <control type="label"><left>285</left><top>5</top><width>760</width><height>45</height><font>font25</font><textcolor>FFFFFFFF</textcolor><label>$INFO[ListItem.Label]</label></control>
+        <control type="textbox"><left>285</left><top>55</top><width>760</width><height>80</height><font>font20</font><textcolor>FFE8E8EC</textcolor><label>$INFO[ListItem.Property(summary)]</label></control>
+      </focusedlayout>
+    </control>
+    <control type="button" id="300"><left>410</left><top>680</top><width>280</width><height>75</height><font>font25</font><label>Play</label><textcolor>FF141417</textcolor><disabledcolor>FF777780</disabledcolor><focusedcolor>FF141417</focusedcolor><texturefocus colordiffuse="FFFFFFFF">white.png</texturefocus><texturenofocus colordiffuse="$INFO[Window.Property(accent)]">white.png</texturenofocus><onleft>100</onleft><onright>210</onright><onup>301</onup><ondown>301</ondown></control>
+    <control type="button" id="301"><left>410</left><top>790</top><width>280</width><height>75</height><font>font25</font><label>Back</label><textcolor>FFE8E8EC</textcolor><focusedcolor>FF141417</focusedcolor><texturefocus colordiffuse="FFFFFFFF">white.png</texturefocus><texturenofocus colordiffuse="FF303038">white.png</texturenofocus><onleft>100</onleft><onright>210</onright><onup>300</onup><ondown>220</ondown></control>
+  </controls>
+</window>

@@ -118,7 +118,7 @@ class AccountWindow(xbmcgui.WindowXML):
             raise
         if status['profile']:
             self._view('account')
-            self._message('Signed in as {}. Your account is ready. Library browsing is the next milestone.'.format(status['profile']['name']))
+            self._message('Signed in as {}. Choose a profile or close this screen to return to your libraries.'.format(status['profile']['name']))
         else:
             self._show_profiles()
 
