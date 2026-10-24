@@ -22,6 +22,10 @@ class Control:
     def addItem(self, item):
         self.items.append(item)
 
+    def addItems(self, items):
+        self.items.extend(items)
+        self.position = 0
+
     def selectItem(self, position):
         self.position = position
 
@@ -157,3 +161,95 @@ class HomeNavigation(unittest.TestCase):
         with patch.object(globals_['xbmcgui'], 'Dialog', return_value=dialog, create=True):
             self.window.onClick(300)
         player.play.assert_not_called()
+
+    def library(self, count=50):
+        self.catalog.page.return_value = {'items': [self.card(str(i)) for i in range(count)],
+                                          'next_cursor': 'page-2'}
+        self.window._library({'id': 'movies', 'name': 'Movies'})
+        return self.window.getControl(200)
+
+    def test_paging_preloads_and_appends_without_moving_selection(self):
+        control = self.library()
+        control.selectItem(10)
+        self.catalog.page.return_value = {'items': [self.card(str(i)) for i in range(49, 100)],
+                                          'next_cursor': 'page-3'}
+        self.window._prefetch()
+        self.assertEqual([item.label for item in control.items], [str(i) for i in range(100)])
+        self.assertEqual(control.position, 10)
+        self.assertEqual(self.window.getControl(20).label, '')
+        self.assertEqual(self.window.getFocusId(), 200)
+
+        self.catalog.page.reset_mock()
+        self.window._prefetch()
+        self.catalog.page.assert_not_called()
+        control.selectItem(40)
+        self.catalog.page.return_value = {'items': [self.card('100')], 'next_cursor': None}
+        self.window._prefetch()
+        self.assertEqual(control.items[-1].label, '100')
+        self.assertEqual(control.position, 40)
+        self.window.onClick(200)
+        self.window._back()
+        self.assertEqual(control.position, 40)
+        self.assertEqual(control.size(), 101)
+
+    def test_paging_discards_result_after_navigation_or_close(self):
+        for transition in (self.open_home, self.window.closed.set):
+            with self.subTest(transition=transition):
+                self.window.closed.clear()
+                self.catalog.page.side_effect = None
+                control = self.library()
+                def fetch(*args):
+                    transition()
+                    return {'items': [self.card('stale')], 'next_cursor': None}
+                self.catalog.page.side_effect = fetch
+                self.window._prefetch()
+                self.assertNotIn('stale', [item.label for item in control.items])
+
+    def test_filtered_pages_continue_but_repeated_cursor_stops(self):
+        control = self.library(count=0)
+        self.catalog.page.side_effect = [
+            {'items': [], 'next_cursor': 'page-3'},
+            {'items': [self.card('a'), self.card('a')], 'next_cursor': 'page-2'},
+        ]
+        self.window._prefetch()
+        self.window._prefetch()
+        self.window._prefetch()
+        self.assertEqual([item.label for item in control.items], ['a'])
+        self.assertIsNone(self.window.page['next_cursor'])
+
+    def test_paging_failure_preserves_cards_and_retries_only_after_reopen(self):
+        control = self.library()
+        control.selectItem(20)
+        self.catalog.page.side_effect = OSError('offline')
+        self.window._prefetch()
+        self.assertEqual(control.size(), 50)
+        self.assertEqual(control.position, 20)
+        self.assertIn('Reopen', self.window.getControl(20).label)
+        self.catalog.page.reset_mock()
+        self.window._prefetch()
+        self.catalog.page.assert_not_called()
+
+        self.window._remember()
+        self.window._show(self.window.page)
+        self.catalog.page.side_effect = None
+        self.catalog.page.return_value = {'items': [self.card('new')], 'next_cursor': None}
+        self.window._prefetch()
+        self.assertEqual(control.items[-1].label, 'new')
+        self.assertEqual(control.position, 20)
+
+    def test_section_paging_keeps_server_cursor_and_profile_authority(self):
+        self.catalog.home_page.return_value = {'items': [self.card('first')], 'next_cursor': 'opaque/+cursor'}
+        self.window._section({'id': 'recent', 'title': 'Recent'})
+        self.catalog.home_page.return_value = {'items': [self.card('second')], 'next_cursor': None}
+        self.window._prefetch()
+        self.catalog.home_page.assert_called_with('recent', 'opaque/+cursor')
+        self.catalog.page.assert_not_called()
+        self.assertEqual([item.label for item in self.window.getControl(200).items], ['first', 'second'])
+
+        self.window.page['next_cursor'] = 'next'
+        def change_profile(*args):
+            self.window.session.status.return_value = {'profile': {'id': 'other'}}
+            return {'items': [self.card('wrong-profile')], 'next_cursor': None}
+        self.catalog.home_page.side_effect = change_profile
+        self.window._prefetch()
+        self.assertEqual([item.label for item in self.window.getControl(200).items], ['first', 'second'])

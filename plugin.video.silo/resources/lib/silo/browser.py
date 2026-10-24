@@ -27,8 +27,13 @@ class BrowserWindow(xbmcgui.WindowXML):
         self.closed = threading.Event()
         self.busy = False
         self.worker = None
+        self.pager = None
+        self.publish_lock = threading.Lock()
 
     def onInit(self):
+        if self.pager is None:
+            self.pager = threading.Thread(target=self._page_loop, daemon=True)
+            self.pager.start()
         if self.page:
             def restore():
                 self._menu()
@@ -39,9 +44,10 @@ class BrowserWindow(xbmcgui.WindowXML):
         self._task(self._load)
 
     def _task(self, operation):
-        if self.busy or self.closed.is_set():
-            return
-        self.busy = True
+        with self.publish_lock:
+            if self.busy or self.closed.is_set():
+                return
+            self.busy = True
         self.getControl(20).setLabel('Loading…')
         def work():
             try:
@@ -76,12 +82,19 @@ class BrowserWindow(xbmcgui.WindowXML):
     def _menu(self):
         menu = self.getControl(100)
         menu.reset()
-        menu.addItem(xbmcgui.ListItem('Home'))
+        media = Path(xbmcaddon.Addon().getAddonInfo('path')) / 'resources/skins/Default/media'
+
+        def add(label, icon):
+            item = xbmcgui.ListItem(label)
+            item.setProperty('nav_icon', str(media / ('nav-' + icon + '.png')))
+            menu.addItem(item)
+
+        add('Home', 'home')
         for library in self.libraries:
-            menu.addItem(xbmcgui.ListItem(_text(library['name'])))
-        menu.addItem(xbmcgui.ListItem('Now playing'))
-        menu.addItem(xbmcgui.ListItem('Account'))
-        menu.addItem(xbmcgui.ListItem('Close'))
+            add(_text(library['name']), 'tv' if library.get('type') == 'series' else 'movies')
+        add('Now playing', 'play')
+        add('Account', 'account')
+        add('Close', 'close')
         self.getControl(11).setLabel(_text(self.session.status()['profile']['name']))
 
     def _home(self):
@@ -200,6 +213,7 @@ class BrowserWindow(xbmcgui.WindowXML):
         if profile is None or profile['id'] != self.catalog.profile_id:
             raise Error('profile_changed')
         self.page = page
+        page.pop('paging_failed', None)
         kind = page['kind']
         self.setProperty('view', kind)
         self.getControl(12).setLabel(_text(page['title']))
@@ -219,8 +233,6 @@ class BrowserWindow(xbmcgui.WindowXML):
             control = self.getControl(control_id)
             for data in page['items']:
                 control.addItem(self._card(data))
-            if page.get('next_cursor'):
-                control.addItem(xbmcgui.ListItem('Load more'))
             if not page['items'] and not page.get('next_cursor'):
                 self.getControl(21).setLabel('This library has no visible titles.')
         else:
@@ -279,15 +291,67 @@ class BrowserWindow(xbmcgui.WindowXML):
         title = '{} · {}'.format(series['title'], 'Specials' if season['season_number'] == 0 else 'Season {}'.format(season['season_number']))
         self._push({'kind': 'season', 'title': title, 'data': data, 'items': episodes})
 
-    def _more(self):
-        self._remember()
+    def _page_loop(self):
+        while not self.closed.wait(.15):
+            page = self.page
+            try:
+                self._prefetch()
+            except Exception:
+                if page is not None:
+                    page['paging_failed'] = True
+                xbmc.log('Silo: background paging failed', xbmc.LOGERROR)
+
+    def _prefetch(self):
         page = self.page
-        data = (self.catalog.home_page(page['section'], page['next_cursor']) if page['kind'] == 'section'
-                else self.catalog.page(page['library']['id'], page['next_cursor']))
-        # A cursor page can overlap if the server catalog changed while browsing.
-        known = {item['content_id'] for item in page['items']}
-        items = page['items'] + [item for item in data['items'] if item['content_id'] not in known]
-        self._show(dict(page, items=items, next_cursor=data['next_cursor']))
+        if (self.busy or self.closed.is_set() or not page
+                or page['kind'] not in ('library', 'section')
+                or not page.get('next_cursor') or page.get('paging_failed')):
+            return
+        control = self.getControl(200)
+        # Keep a full server page plus a screen ahead of the selection.
+        if len(page['items']) - max(0, control.getSelectedPosition()) > 62:
+            return
+        cursor = page['next_cursor']
+        try:
+            data = (self.catalog.home_page(page['section'], cursor) if page['kind'] == 'section'
+                    else self.catalog.page(page['library']['id'], cursor))
+        except Exception:
+            page['paging_failed'] = True
+            with self.publish_lock:
+                if self.page is page and not self.busy and not self.closed.is_set():
+                    self.getControl(20).setLabel('Could not load more titles. Reopen this page to retry.')
+            return
+
+        while self.busy and not self.closed.wait(.1):
+            pass
+        with self.publish_lock:
+            # Navigation owns the controls while a foreground operation is running.
+            if self.closed.is_set() or self.busy or self.page is not page:
+                return
+            profile = self.session.status()['profile']
+            if profile is None or profile['id'] != self.catalog.profile_id:
+                page['paging_failed'] = True
+                return
+            seen = page.setdefault('cursors', set())
+            seen.add(cursor)
+            known = {item['content_id'] for item in page['items']}
+            added = []
+            for item in data['items']:
+                if item['content_id'] not in known:
+                    known.add(item['content_id'])
+                    added.append(item)
+            page['items'].extend(added)
+            if added:
+                selection = max(0, control.getSelectedPosition())
+                # Kodi rebinds the entire list on addItems; restore focus in the same message batch.
+                control.addItems([self._card(item) for item in added])
+                control.selectItem(selection)
+            next_cursor = data['next_cursor']
+            page['next_cursor'] = next_cursor if next_cursor not in seen else None
+            if not page['items'] and not page['next_cursor']:
+                self.getControl(21).setLabel('This library has no visible titles.')
+            if page['items']:
+                self.getControl(100).controlRight(control)
 
     def _play(self):
         if xbmc.Player().isPlaying():
@@ -362,9 +426,7 @@ class BrowserWindow(xbmcgui.WindowXML):
                 self._task(lambda: self._detail(row['items'][index]['content_id']))
         elif control == 200:
             index = self.getControl(200).getSelectedPosition()
-            if index == len(self.page['items']):
-                self._task(self._more)
-            elif index >= 0:
+            if 0 <= index < len(self.page['items']):
                 content_id = self.page['items'][index]['content_id']
                 self._task(lambda: self._detail(content_id))
         elif control == 210:
@@ -402,6 +464,8 @@ class BrowserWindow(xbmcgui.WindowXML):
         self.closed.set()
         if self.worker:
             self.worker.join(timeout=35)
+        if self.pager:
+            self.pager.join(timeout=35)
 
 
 def open_browser():
