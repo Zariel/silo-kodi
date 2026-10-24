@@ -1,0 +1,6 @@
+.scratch/
+dist/
+__pycache__/
+*.py[cod]
+.venv/
+.local-testing/
