@@ -72,6 +72,7 @@ class Attempt:
         self.last_sample = None
         self.stop_body = None
         self.plan = None
+        self.plan_attempt_id = None
         self.subtitle_url = None
         self.ended = False
         capability = self._request('GET', '/playback/capabilities')
@@ -110,8 +111,36 @@ class Attempt:
     def start(self):
         result = self._mutation('POST', '/playback/start', self.body)
         self.session_id = result.get('session_id')
+        return self._accept(result)
+
+    def select_subtitle(self, track_id, position):
+        if self.ended or not self.plan or not self.session_id:
+            raise Error('unsupported_playback')
+        inventory = self.plan.get('subtitle', {}).get('inventory', [])
+        if track_id is not None and not any(track.get('track_id') == track_id for track in inventory):
+            raise Error('unsupported_playback')
+        tracks = dict(self.plan.get('selected_tracks') or {})
+        tracks.pop('subtitle', None)
+        if track_id is not None:
+            tracks['subtitle'] = {'id': track_id}
+        body = {key: self.body[key] for key in (
+            'installation_id', 'protocol_version', 'playback_attempt_id', 'quality_preference',
+            'client_features', 'client_capabilities', 'client_playback_context')}
+        # Track changes are new user intent, not failed-route recovery. Off is
+        # represented by omitting subtitle only for this operation.
+        body.update(operation='track_change', replan_request_id=str(uuid.uuid4()),
+                    failed_plan_id=self.plan['plan_id'], plan_attempt_id=self.plan_attempt_id,
+                    plan_attempt_key=self.plan['plan_attempt_key'], attempted_plan_keys=[],
+                    attempt_count=1, position_seconds=max(0, position), selected_tracks=tracks)
+        result = self._mutation('POST', '/playback/' + quote(self.session_id, safe='') + '/replan', body)
+        return self._accept(result)
+
+    def _accept(self, result):
         self.plan = result.get('playback_plan')
-        if result.get('outcome') != 'playable' or not self.session_id or not self.plan:
+        self.plan_attempt_id = str(uuid.uuid4())
+        self.subtitle_url = None
+        if (result.get('outcome') != 'playable' or not self.session_id or not self.plan
+                or result.get('session_id') != self.session_id):
             raise Error('unsupported_playback')
         if (self.plan.get('delivery') != 'original_http'
                 or self.plan.get('stream', {}).get('header_refresh') not in ('none', None)
