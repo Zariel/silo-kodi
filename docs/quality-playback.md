@@ -1,6 +1,6 @@
 # Select playback quality without losing position
 
-Status: quality controls, replans, and native player transitions are implemented. The installed add-on passes original → 360p → Auto → 360p through the remote menu, including paused changes and subsequent resume. Capabilities advertise original HTTP and SDR H.264/AAC HLS. Combined text-subtitle/quality transitions pass representative checks. Native audio selection is lost across quality changes on a multi-audio fixture; reconciliation, interruption cases, and broader media qualification remain unfinished.
+Status: quality controls, replans, and native player transitions are implemented. The installed add-on passes original → 360p → Auto → 360p through the remote menu, including paused changes and subsequent resume. Capabilities advertise original HTTP and SDR H.264/AAC HLS. Combined text-subtitle/quality transitions pass representative checks. A selected nondefault AC3 soundtrack survives original → 360p → Auto on a multi-audio fixture. Broader track metadata, interruption cases, and media qualification remain unfinished.
 
 ## Requirement and ownership
 
@@ -52,7 +52,7 @@ Apply this transition to every replan involving transcoded HLS, including subtit
 
 ## Preserve the selected soundtrack
 
-The installed-player regression selects a nondefault AC3 soundtrack, pauses, changes to 360p, then returns to Auto. Position and pause survive, but the returned original selects DTS-HD MA instead of AC3. Copying the previous plan's `selected_tracks` does not capture a choice made through Kodi's audio controls. Kodi can also retain a native choice across playback starts, independently of the server's initial selection.
+The installed-player regression selects a nondefault AC3 soundtrack, pauses, changes to 360p, then returns to Auto. It verifies the returned original still selects AC3, with position and pause preserved. Copying the previous plan's `selected_tracks` alone does not capture a choice made through Kodi's audio controls. Kodi can also retain a native choice across playback starts, independently of the server's initial selection.
 
 Keep reconciliation in the playback owner. Before a quality or subtitle replan, observe the current native audio selection and map it to the source inventory. Submit that identity with the same replan rather than starting a second session or performing a separate track-change mutation. After reopening an original file, select the corresponding native stream and observe it selected before publishing a completed transition. For packaged HLS, retain the plan's source identity; its single delivered audio stream does not have the source's index.
 
@@ -65,7 +65,9 @@ Kodi's JSON-RPC audio index is an ordinal in the current player's audio list. Si
 - Compare channel count and available title/profile evidence. Kodi decorates embedded titles with a stream-type suffix; repeated or absent titles are not unique identities.
 - Treat default flags as metadata, not evidence that the default stream is currently selected. Reject unresolved matches before a replan, leave the current playback running, and explain why the requested transition is unavailable.
 
-Silo's `client_selected_audio_track_v1` claim on `original_http` permits a nondefault source soundtrack without requiring a remux. Advertise it only with the native selection and verification implementation. A server probe carried the nondefault source identity through 360p HLS and back to original with this claim; that proves negotiation support, not that the installed player preserves the soundtrack. Do not add the claim to HLS or apply a source ordinal to its packaged audio list.
+Silo's `client_selected_audio_track_v1` claim on `original_http` permits a nondefault source soundtrack without requiring a remux. The add-on advertises it when it has fetched the selected file's audio inventory and applies and verifies the server selection on original playback. A server probe carried the nondefault source identity through 360p HLS and back to original with this claim; the installed-player regression separately verifies native restoration. Do not add the claim to HLS or apply a source ordinal to its packaged audio list.
+
+Missing inventory or ambiguous metadata prevents preserving native audio across a replan. A rejected request before mutation leaves playback running. If an accepted original plan's audio identity cannot be mapped or selected, fail and clean up the session rather than playing a different soundtrack. File-only developer routes can still start playback but need the catalog content ID for original audio reconciliation.
 
 Acceptance must include original → HLS → original with a nondefault soundtrack, a paused transition, subtitle replans, a reordered native inventory, ambiguous metadata, and replacement playback during selection. Independently observe the final selected native stream and preserved position; a successful server response alone does not prove restoration.
 
@@ -81,7 +83,7 @@ The shared replan implementation has also been exercised against the server: ori
 
 The probe also established a source-identity requirement. On every ListItem used to reopen playback, preserve the genuine originating plugin route in `original_listitem_url`. Kodi otherwise treats the temporary relay URL as a file when persisting watched state, a bookmark, and stream details. Each path can query the file modification date, producing three HTTP HEAD requests during shutdown. Plugin identities skip those modification-date lookups. The target's native stop completed in 0.28 seconds with the property preserved; relay and session cleanup then completed normally. Normal plugin resolution supplies this property, but a direct `Player.play` reopen must retain it explicitly.
 
-The installed add-on's remote-menu acceptance selected 360p and independently observed Kodi's decoded height and preserved position. Returning to Auto restored the source resolution while paused. Selecting 360p again preserved pause and position, and resuming advanced the clock. Cleanup released playback authority and restored the screensaver. A subsequent visual check confirmed the same WebVTT cue in original, 360p HLS, and returned Auto playback, and its absence with Off in HLS. Audio identity across transitions, interruption during reopen, and all offered rungs remain unqualified.
+The installed add-on's remote-menu acceptance selected 360p and independently observed Kodi's decoded height and preserved position. Returning to Auto restored the source resolution while paused. Selecting 360p again preserved pause and position, and resuming advanced the clock. Cleanup released playback authority and restored the screensaver. A subsequent visual check confirmed the same WebVTT cue in original, 360p HLS, and returned Auto playback, and its absence with Off in HLS. Additional soundtrack metadata, interruption during reopen, and all offered rungs remain unqualified.
 
 The full acceptance scope remains:
 

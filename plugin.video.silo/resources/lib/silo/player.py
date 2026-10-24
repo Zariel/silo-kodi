@@ -1,4 +1,5 @@
 """Kodi owns playback; this invocation owns exactly one Silo session."""
+import json
 import time
 
 import xbmc
@@ -6,6 +7,7 @@ import xbmcgui
 import xbmcplugin
 
 from .client import Error
+from .audio import SourceAudio
 from .controls import PlaybackControls
 from .playback import Attempt
 from .relay import MediaRelay
@@ -52,7 +54,22 @@ def _item(title, url, source, plan):
     return item
 
 
-def play(handle, session, profile_id, file_id, title, start_position=None, source=None, subtitle_track_id=None):
+def _audio_state():
+    def request(method, params=None):
+        response = json.loads(xbmc.executeJSONRPC(json.dumps(
+            {'jsonrpc': '2.0', 'id': 1, 'method': method, 'params': params or {}})))
+        if 'result' not in response:
+            raise Error('audio_selection_unavailable')
+        return response['result']
+
+    players = [item for item in request('Player.GetActivePlayers') if item.get('type') == 'video']
+    if len(players) != 1:
+        raise Error('audio_selection_unavailable')
+    return request('Player.GetProperties', {'playerid': players[0]['playerid'],
+                                           'properties': ['audiostreams', 'currentaudiostream']})
+
+
+def play(handle, session, profile_id, file_id, title, start_position=None, source=None, subtitle_track_id=None, content_id=None):
     attempt = None
     relay = None
     controls = None
@@ -69,7 +86,10 @@ def play(handle, session, profile_id, file_id, title, start_position=None, sourc
         with session.store.playback_lock():
             try:
                 controls = PlaybackControls()
-                attempt = Attempt(session, profile_id, file_id, start_position, subtitle_track_id=subtitle_track_id)
+                attempt = Attempt(session, profile_id, file_id, start_position,
+                                  subtitle_track_id=subtitle_track_id, content_id=content_id)
+                audio = SourceAudio(file_id, attempt.audio_tracks,
+                                    lambda value: xbmc.convertLanguage(value, xbmc.ISO_639_2)) if attempt.audio_tracks else None
                 attempt.start()
                 video_name = 'video'
                 resources = {video_name: attempt.plan['stream']}
@@ -89,6 +109,7 @@ def play(handle, session, profile_id, file_id, title, start_position=None, sourc
                 resume_pending = start > 0
                 seek_deadline = None
                 tracks_applied = False
+                audio_deadline = None
                 while not monitor.abortRequested():
                     if pending_url is not None:
                         # Core changes can emit an old stop callback. Commit only
@@ -150,6 +171,21 @@ def play(handle, session, profile_id, file_id, title, start_position=None, sourc
                         if restore_pause is not None:
                             monitor.waitForAbort(.25)
                             continue
+                    if not tracks_applied and audio and attempt.plan.get('delivery') == 'original_http':
+                        identity = attempt.plan.get('selected_tracks', {}).get('audio')
+                        if identity:
+                            observed = _audio_state()
+                            native_index = audio.native_index(identity, observed['audiostreams'])
+                            if not _owns(player, url, source):
+                                break
+                            if observed['currentaudiostream'].get('index') != native_index:
+                                if audio_deadline is None:
+                                    player.setAudioStream(native_index)
+                                    audio_deadline = time.monotonic() + 15
+                                elif time.monotonic() > audio_deadline:
+                                    raise Error('audio_selection_unavailable')
+                                monitor.waitForAbort(.25)
+                                continue
                     last_position = position
                     request = controls.take()
                     if request is not None:
@@ -157,11 +193,25 @@ def play(handle, session, profile_id, file_id, title, start_position=None, sourc
                         if not previous_file:
                             raise Error('unsupported_playback')
                         previous_delivery = attempt.plan.get('delivery')
+                        audio_track = None
+                        if previous_delivery == 'original_http' and attempt.plan.get('selected_tracks', {}).get('audio'):
+                            try:
+                                if audio is None:
+                                    raise Error('audio_selection_unavailable')
+                                observed = _audio_state()
+                                audio_track = audio.identity(observed['audiostreams'], observed['currentaudiostream'].get('index'))
+                            except Error as exc:
+                                # Identity uncertainty must not retire a working plan.
+                                controls.publish(attempt.plan, attempt.body['quality_preference'])
+                                xbmcgui.Dialog().notification('Silo', str(exc), xbmcgui.NOTIFICATION_ERROR)
+                                continue
+                        if not _owns(player, url, source):
+                            break
                         quality_change = 'quality' in request
                         if quality_change:
-                            attempt.select_quality(request['quality'], position)
+                            attempt.select_quality(request['quality'], position, audio_track=audio_track)
                         else:
-                            attempt.select_subtitle(request['subtitle'], position)
+                            attempt.select_subtitle(request['subtitle'], position, audio_track=audio_track)
                         if not _owns(player, url, source):
                             break
                         if attempt.plan.get('effective_media_file_id') != previous_file:
@@ -179,6 +229,7 @@ def play(handle, session, profile_id, file_id, title, start_position=None, sourc
                             resources[subtitle_name] = artifact
                         relay.update(resources)
                         tracks_applied = False
+                        audio_deadline = None
                         if reopen:
                             pending_url = url
                             url = relay.url(video_name)

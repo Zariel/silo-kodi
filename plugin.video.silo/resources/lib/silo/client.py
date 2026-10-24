@@ -36,7 +36,8 @@ class Error(Exception):
             'state_unreadable': 'The saved Silo session could not be read.',
             'redirect_refused': 'Silo redirected the API request. Check the configured server URL.',
             'playback_active': 'Stop playback before changing the account, profile, or server.',
-            'unsupported_playback': 'Silo could not provide a supported original stream for this file.',
+            'unsupported_playback': 'Silo could not provide a supported stream for this file.',
+            'audio_selection_unavailable': 'Cannot preserve this audio track for the playback change.',
         }
         # Never display arbitrary response bodies or URLs containing credentials.
         super().__init__(messages.get(code, 'Silo refused the request (HTTP {}).'.format(status)))

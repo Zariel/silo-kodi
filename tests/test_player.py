@@ -14,7 +14,7 @@ class Lifetime(unittest.TestCase):
         state = SimpleNamespace(file=None, closed=False, relay_closed=False, clock=0, player=None,
                                 subtitles=[], relay_updated=False, item_properties={}, position=20,
                                 paused=scenario.startswith('quality') or scenario == 'hls_subtitle',
-                                done=False, samples=[], opens=[])
+                                done=False, samples=[], opens=[], audio_index=1, audio_selections=[])
         url = 'https://silo.example.test/api/v2/stream/owned'
 
         class Player:
@@ -37,6 +37,7 @@ class Lifetime(unittest.TestCase):
                 state.paused = not state.paused
 
             def play(self, path, item):
+                state.audio_index = 1
                 state.opens.append(path)
                 state.file = path
                 state.position = 0
@@ -60,6 +61,10 @@ class Lifetime(unittest.TestCase):
             def showSubtitles(self, enabled):
                 pass
 
+            def setAudioStream(self, index):
+                state.audio_selections.append(index)
+                state.audio_index = index
+
         class Monitor:
             def abortRequested(self):
                 return state.done
@@ -71,10 +76,16 @@ class Lifetime(unittest.TestCase):
 
         class Attempt:
             def __init__(self, *args, **kwargs):
+                self.audio_tracks = None
                 self.body = {'quality_preference': 'auto'}
                 self.plan = {'stream': {}, 'timeline': {'player_start_seconds': 0}, 'effective_media_file_id': 'file'}
                 self.plan['delivery'] = 'server_transcode_hls' if scenario == 'hls_subtitle' else 'original_http'
                 self.plan['subtitle'] = {'artifact': {'format': 'vtt'}}
+                if scenario.startswith('quality_audio'):
+                    self.audio_tracks = [{'codec': 'dts', 'channels': 6}, {'codec': 'ac3', 'channels': 2}]
+                    self.plan['selected_tracks'] = {'audio': {'id': 'file:file:audio:0', 'index': 0}}
+                    if scenario == 'quality_audio_ambiguous':
+                        self.audio_tracks.append(dict(self.audio_tracks[1]))
                 self.subtitle_url = '/subtitle.vtt' if scenario == 'subtitle_error' else None
 
             def start(self):
@@ -84,8 +95,11 @@ class Lifetime(unittest.TestCase):
                 state.samples.append(args)
                 if state.opens or scenario == 'hls_subtitle':
                     state.done = True
+                    state.reported_audio = state.audio_index
+                elif scenario.startswith('quality_audio'):
+                    state.audio_index = 0
 
-            def select_subtitle(self, track, position):
+            def select_subtitle(self, track, position, audio_track=None):
                 if scenario == 'hls_subtitle':
                     self.plan_attempt_id = 'new-plan'
                     self.plan['timeline']['player_start_seconds'] = position
@@ -94,7 +108,10 @@ class Lifetime(unittest.TestCase):
                 self.subtitle_url = '/subtitle.vtt'
                 self.plan_attempt_id = 'new-plan'
 
-            def select_quality(self, quality, position):
+            def select_quality(self, quality, position, audio_track=None):
+                if scenario.startswith('quality_audio'):
+                    state.requested_audio = audio_track
+                    self.plan['selected_tracks']['audio'] = audio_track
                 self.plan_attempt_id = 'new-plan'
                 self.body['quality_preference'] = quality
                 self.plan['timeline']['player_start_seconds'] = position
@@ -141,12 +158,45 @@ class Lifetime(unittest.TestCase):
             controls.take.return_value = {'subtitle': 'track'} if scenario == 'replan_replacement' else None
             if scenario.startswith('quality'):
                 controls.take.side_effect = [{'quality': '360p'}, None]
+            if scenario.startswith('quality_audio'):
+                controls.take.side_effect = [None, {'quality': 'auto'}, None]
+            if scenario == 'quality_audio_ambiguous':
+                def published(*args):
+                    if controls.publish.call_count == 2:
+                        state.refused_while_playing = state.file == url
+                        state.done = True
+                controls.publish.side_effect = published
             if scenario == 'hls_subtitle':
                 controls.take.side_effect = [{'subtitle': None}, None]
-            with patch.object(module, 'Attempt', Attempt), patch.object(module, 'MediaRelay', Relay), patch.object(module, 'PlaybackControls', return_value=controls), patch.object(module.time, 'monotonic', lambda: state.clock):
+            def audio_state():
+                if scenario == 'quality_audio_replacement' and state.opens:
+                    state.file = 'https://other.example.test/replacement'
+                return {'audiostreams': [{'index': 0, 'codec': 'ac3', 'channels': 2},
+                                         {'index': 1, 'codec': 'dtshd_ma', 'channels': 6}],
+                        'currentaudiostream': {'index': state.audio_index}}
+
+            with patch.object(module, '_audio_state', audio_state), patch.object(module, 'Attempt', Attempt), patch.object(module, 'MediaRelay', Relay), patch.object(module, 'PlaybackControls', return_value=controls), patch.object(module.time, 'monotonic', lambda: state.clock):
                 session = SimpleNamespace(store=SimpleNamespace(playback_lock=nullcontext))
                 module.play(1, session, 'profile', 'file', 'Title', source=source)
         return state
+
+    def test_quality_reopen_restores_observed_audio_before_reporting(self):
+        state = self.run_playback('quality_audio')
+        self.assertEqual(state.requested_audio, {'id': 'file:file:audio:1', 'index': 1})
+        self.assertEqual(state.audio_selections, [0])
+        self.assertEqual(state.reported_audio, 0)
+        self.assertEqual(state.samples[-1], (20, True))
+
+    def test_ambiguous_audio_keeps_current_playback_without_replanning(self):
+        state = self.run_playback('quality_audio_ambiguous')
+        self.assertTrue(state.refused_while_playing)
+        self.assertFalse(hasattr(state, 'requested_audio'))
+        self.assertEqual(state.opens, [])
+
+    def test_audio_restoration_does_not_change_replacement_player(self):
+        state = self.run_playback('quality_audio_replacement')
+        self.assertEqual(state.audio_selections, [])
+        self.assertEqual(state.file, 'https://other.example.test/replacement')
 
     def test_list_item_retains_plugin_identity_for_kodi_bookkeeping(self):
         source = 'plugin://plugin.video.silo/?action=play&file=example'

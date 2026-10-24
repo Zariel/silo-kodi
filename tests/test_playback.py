@@ -23,6 +23,7 @@ class Server:
         self.delivery = 'original_http'
         self.subtitle = {'mode': 'off'}
         self.replans = 0
+        self.versions = []
         self.tracks = {'audio': {'id': 'audio-commentary', 'index': 2}}
         self.timeline = {'can_seek_anywhere': True, 'player_start_seconds': 24, 'timeline_offset_seconds': 0}
 
@@ -30,6 +31,8 @@ class Server:
         if expected_profile != 'viewer':
             raise AssertionError('Playback lost its originating profile')
         self.calls.append((method, path, copy.deepcopy(body)))
+        if path.endswith('/versions'):
+            return {'items': self.versions}
         if self.fail == path:
             self.fail = None
             raise Error('connection_failed')
@@ -52,6 +55,19 @@ class Server:
 
 
 class Playback(unittest.TestCase):
+    def test_inventory_is_fetched_under_playback_profile_and_scopes_audio_claim(self):
+        server = Server()
+        server.versions = [{'file_id': '42', 'audio_tracks': [{'codec': 'ac3', 'channels': 2}]}]
+        attempt = Attempt(server, 'viewer', '42', content_id='movie/42')
+        attempt.start()
+        self.assertEqual(server.calls[0][:2], ('GET', '/catalog/items/movie%2F42/versions'))
+        self.assertEqual(attempt.audio_tracks, [{'codec': 'ac3', 'channels': 2}])
+        deliveries = attempt.body['client_playback_context']['deliveries']
+        self.assertIn('client_selected_audio_track_v1', deliveries['original_http']['validated_claims'])
+        self.assertNotIn('client_selected_audio_track_v1', deliveries['hls']['validated_claims'])
+        with self.assertRaises(Error):
+            Attempt(server, 'viewer', '99', content_id='movie/42')
+
     def test_original_presentation_is_delegated_without_claiming_sink_formats(self):
         server = Server()
         attempt = Attempt(server, 'viewer', 'file-7')
@@ -99,6 +115,38 @@ class Playback(unittest.TestCase):
         with self.assertRaises(Error):
             attempt.select_quality('invented-rung', 12)
         self.assertFalse(any(path.endswith('/replan') for _, path, _ in server.calls))
+
+    def test_observed_audio_replaces_plan_selection_for_both_controls(self):
+        server = Server()
+        attempt = Attempt(server, 'viewer', '42')
+        attempt.start()
+        commentary = {'id': 'file:42:audio:1', 'index': 1}
+        main = {'id': 'file:42:audio:0', 'index': 0}
+        attempt.select_quality('360p', 40, audio_track=commentary)
+        attempt.select_subtitle(None, 42, audio_track=main)
+        requests = [body for _, path, body in server.calls if path.endswith('/replan')]
+        self.assertEqual(requests[0]['selected_tracks']['audio'], commentary)
+        self.assertEqual(requests[1]['selected_tracks']['audio'], main)
+        self.assertEqual(requests[1]['quality_preference'], '360p')
+
+    def test_different_returned_audio_is_rejected_with_new_plan_retained_for_cleanup(self):
+        server = Server()
+        request = server.request
+
+        def replace_audio(method, path, body=None, expected_profile=None):
+            response = copy.deepcopy(request(method, path, body, expected_profile))
+            if path.endswith('/replan'):
+                response['playback_plan']['selected_tracks']['audio'] = {'id': 'different-audio', 'index': 0}
+            return response
+
+        server.request = replace_audio
+        attempt = Attempt(server, 'viewer', '42')
+        attempt.start()
+        with self.assertRaises(Error):
+            attempt.select_quality('360p', 40, audio_track={'id': 'file:42:audio:1', 'index': 1})
+        self.assertEqual(attempt.plan['plan_id'], 'plan-1')
+        attempt.stop(40)
+        self.assertEqual(server.calls[-1][:2], ('DELETE', '/playback/session-1'))
 
     def test_anchored_hls_is_rejected_without_losing_committed_plan(self):
         server = Server()

@@ -69,7 +69,7 @@ def subtitle_url(server, decision, authority):
 
 
 class Attempt:
-    def __init__(self, session, profile_id, file_id, start_position=None, subtitle_track_id=None):
+    def __init__(self, session, profile_id, file_id, start_position=None, subtitle_track_id=None, content_id=None):
         self.session = session
         self.profile_id = profile_id
         self.session_id = None
@@ -80,11 +80,20 @@ class Attempt:
         self.plan_attempt_id = None
         self.subtitle_url = None
         self.ended = False
+        self.audio_tracks = None
+        if content_id is not None:
+            versions = self._request('GET', '/catalog/items/' + quote(str(content_id), safe='') + '/versions')['items']
+            version = next((item for item in versions if str(item['file_id']) == str(file_id)), None)
+            if version is None:
+                raise Error('unsupported_playback')
+            self.audio_tracks = version.get('audio_tracks')
         capability = self._request('GET', '/playback/capabilities')
         if not capability.get('allowed') or 3 not in capability.get('protocol_versions', []):
             raise Error('unsupported_playback')
         self.installation = capability['installation_id']
         decoder, context = capabilities()
+        if self.audio_tracks:
+            context['deliveries']['original_http']['validated_claims'].append('client_selected_audio_track_v1')
         self.body = {'installation_id': self.installation, 'protocol_version': 3,
                      'client_features': ['playback_plan_v3'], 'file_id': str(file_id),
                      'profile_id': profile_id, 'playback_attempt_id': str(uuid.uuid4()),
@@ -118,7 +127,7 @@ class Attempt:
         self.session_id = result.get('session_id')
         return self._accept(result)
 
-    def select_subtitle(self, track_id, position):
+    def select_subtitle(self, track_id, position, audio_track=None):
         if self.ended or not self.plan or not self.session_id:
             raise Error('unsupported_playback')
         inventory = self.plan.get('subtitle', {}).get('inventory', [])
@@ -128,17 +137,19 @@ class Attempt:
         tracks.pop('subtitle', None)
         if track_id is not None:
             tracks['subtitle'] = {'id': track_id}
-        return self._replan('track_change', tracks, self.body['quality_preference'], position)
+        return self._replan('track_change', tracks, self.body['quality_preference'], position, audio_track)
 
-    def select_quality(self, quality, position):
+    def select_quality(self, quality, position, audio_track=None):
         if self.ended or not self.plan or not self.session_id:
             raise Error('unsupported_playback')
         if quality != 'auto' and not any(
                 entry.get('label') == quality for entry in self.plan.get('available_qualities', [])):
             raise Error('unsupported_playback')
-        return self._replan('quality_change', dict(self.plan.get('selected_tracks') or {}), quality, position)
+        return self._replan('quality_change', dict(self.plan.get('selected_tracks') or {}), quality, position, audio_track)
 
-    def _replan(self, operation, tracks, quality, position):
+    def _replan(self, operation, tracks, quality, position, audio_track=None):
+        if audio_track is not None:
+            tracks['audio'] = dict(audio_track)
         body = {key: self.body[key] for key in (
             'installation_id', 'protocol_version', 'playback_attempt_id', 'quality_preference',
             'client_features', 'client_capabilities', 'client_playback_context')}
@@ -151,7 +162,11 @@ class Attempt:
         result = self._mutation('POST', '/playback/' + quote(self.session_id, safe='') + '/replan', body)
         # The server may have committed before local delivery validation fails.
         self.body['quality_preference'] = quality
-        return self._accept(result)
+        url = self._accept(result)
+        expected_audio = tracks.get('audio')
+        if expected_audio and self.plan.get('selected_tracks', {}).get('audio', {}).get('id') != expected_audio['id']:
+            raise Error('audio_selection_unavailable')
+        return url
 
     def _accept(self, result):
         self.plan = result.get('playback_plan')

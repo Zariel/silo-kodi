@@ -235,6 +235,7 @@ class BrowserWindow(xbmcgui.WindowXML):
         if self.closed.is_set():
             return
         query = {'action': 'play', 'profile': self.catalog.profile_id,
+                 'content': data['content_id'],
                  'file': versions[index]['file_id'], 'title': data.get('title') or 'Silo'}
         if restart:
             query['restart'] = 'true'

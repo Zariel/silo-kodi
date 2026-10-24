@@ -12,6 +12,8 @@ During playback, return to Silo's browser and choose **Now playing → Subtitles
 
 Choose **Now playing → Quality** for Silo's available qualities or **Auto**. Changing quality preserves position and pause while reopening the video. The initial transcoded path supports SDR H.264/AAC HLS; other delivery combinations remain unqualified.
 
+Audio selected through Kodi's controls is carried across quality and subtitle changes when the source track can be matched uniquely. A nondefault soundtrack passes an original → 360p → Auto check. Ambiguous track metadata can prevent a playback change; the add-on reports this instead of guessing a soundtrack.
+
 - [Minimal client design](docs/design.md)
 - [Development and target test loop](docs/testing.md)
 - [Packaging and GitHub Releases](docs/releases.md)
