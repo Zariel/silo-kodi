@@ -9,6 +9,35 @@ dev = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(dev)
 
 
+class PlaybackObservation(unittest.TestCase):
+    def observe(self, mode):
+        clock = SimpleNamespace(value=0)
+
+        def sleep(seconds):
+            clock.value += seconds
+
+        def state():
+            if mode == 'replacement' and clock.value > 0:
+                return None
+            return {'speed': 1, 'time': {'hours': 0, 'minutes': 0, 'milliseconds': 0,
+                                         'seconds': 0 if mode == 'stall' else clock.value}}
+
+        with patch.object(dev.time, 'sleep', side_effect=sleep), \
+                patch.object(dev.time, 'monotonic', side_effect=lambda: clock.value), \
+                patch.object(dev, 'rpc', return_value={'Player.Caching': mode == 'buffering'}):
+            return dev._observe_playback(None, state, 12)
+
+    def test_advancing_clock_is_observed_for_the_requested_window(self):
+        result = self.observe('advancing')
+        self.assertGreaterEqual(result['seconds'], 12)
+        self.assertEqual(result['max_clock_drift_seconds'], 0)
+
+    def test_stalls_buffering_and_replacement_fail_observation(self):
+        for mode in ('stall', 'buffering', 'replacement'):
+            with self.subTest(mode=mode), self.assertRaises(RuntimeError):
+                self.observe(mode)
+
+
 class DisplayCleanup(unittest.TestCase):
     def exercise(self, replacement=False, ignored=False):
         state = SimpleNamespace(clock=0, active=False, activation=None, woke=False)

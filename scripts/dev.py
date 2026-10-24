@@ -235,6 +235,34 @@ except Error as exc:
     raise RuntimeError("Idle display protection did not settle after playback cleanup")
 
 
+def _observe_playback(args, state, duration):
+    baseline = state()
+    if not baseline or baseline['speed'] != 1:
+        raise RuntimeError('Owned playback is not advancing')
+    started = time.monotonic()
+    position = seconds(baseline['time'])
+    samples = 0
+    largest_drift = 0
+    while True:
+        remaining = duration - (time.monotonic() - started)
+        if remaining <= 0:
+            break
+        time.sleep(min(5, remaining))
+        current = state()
+        elapsed = time.monotonic() - started
+        if not current or current['speed'] != 1:
+            raise RuntimeError('Owned playback stopped, paused, or was replaced')
+        drift = abs(seconds(current['time']) - position - elapsed)
+        buffering = rpc(args, 'XBMC.GetInfoBooleans', {'booleans': ['Player.Caching']})['Player.Caching']
+        if buffering or drift > 3:
+            raise RuntimeError('Playback buffered or its clock diverged during observation')
+        samples += 1
+        largest_drift = max(largest_drift, drift)
+        if samples % 12 == 0:
+            print('Playback observation: {:.0f}s; clock drift {:.2f}s'.format(elapsed, drift), flush=True)
+    return {'seconds': time.monotonic() - started, 'samples': samples, 'max_clock_drift_seconds': largest_drift}
+
+
 def smoke(args):
     idle(args)
     profile = json.loads(remote_python(args, """
@@ -247,9 +275,12 @@ print(json.dumps(session.status().get('profile') if session else None))
     if not profile:
         raise RuntimeError("Sign in and choose a Silo profile before running playback acceptance")
     label = 'Silo playback check ' + uuid.uuid4().hex
-    route = 'plugin://plugin.video.silo/?' + urlencode({
+    query = {
         'action': 'play', 'profile': profile['id'], 'file': args.file_id,
-        'title': label, 'restart': 'true'})
+        'title': label, 'restart': 'true'}
+    if args.content_id:
+        query['content'] = args.content_id
+    route = 'plugin://plugin.video.silo/?' + urlencode(query)
 
     def owned_player():
         for active in rpc(args, "Player.GetActivePlayers"):
@@ -277,8 +308,8 @@ print(json.dumps(session.status().get('profile') if session else None))
         rpc(args, "Player.Open", {"item": {"file": route}})
         ready = wait_for(state, lambda value: value and value["canseek"]
                          and seconds(value["time"]) > 0, timeout=60)
-        if seconds(ready['totaltime']) < 60:
-            raise RuntimeError("Choose a test video at least 60 seconds long")
+        if seconds(ready['totaltime']) < 60 + args.observe_seconds:
+            raise RuntimeError("Choose a test video longer than the observation window plus 60 seconds")
         control("Player.PlayPause", {"play": False})
 
         def pause_sample():
@@ -293,6 +324,8 @@ print(json.dumps(session.status().get('profile') if session else None))
         control("Player.PlayPause", {"play": True})
         wait_for(state, lambda value: value and value["speed"] == 1 and seconds(value["time"]) > 47)
         print("Silo video played, paused, sought to 45s, and resumed: OK")
+        if args.observe_seconds:
+            print('Playback observation: ' + json.dumps(_observe_playback(args, state, args.observe_seconds)))
     finally:
         # Player IDs can change with playlist context. Match this invocation's
         # identity before stopping, never merely the player ID observed at start.
@@ -314,7 +347,11 @@ def main():
     parser.add_argument("--server", default=os.environ.get("SILO_SERVER_URL"))
     parser.add_argument("--release-tag", help="Require the package version to match this v-prefixed release tag")
     parser.add_argument("--file-id", default=os.environ.get("SILO_TEST_FILE_ID"), help="Silo video file for playback acceptance")
+    parser.add_argument("--content-id", default=os.environ.get("SILO_TEST_CONTENT_ID"), help="Catalog content ID for source audio reconciliation")
+    parser.add_argument("--observe-seconds", type=int, default=0, help="Continue smoke playback while checking clock continuity and buffering")
     args = parser.parse_args()
+    if args.observe_seconds < 0:
+        parser.error('--observe-seconds must be nonnegative')
     required = []
     if args.command not in ("check", "package"):
         required.append("rpc")

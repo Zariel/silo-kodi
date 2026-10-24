@@ -42,6 +42,14 @@ Before running `smoke`, sign in and choose a profile in the add-on. Set `SILO_TE
 
 `smoke` refuses to interrupt existing playback. It opens the normal playback route, checks player readiness, pauses and verifies a stable clock, seeks to 45 seconds, resumes and verifies clock advancement, then stops its own playback. It matches a unique invocation identity instead of assuming a fixed player ID. Cleanup preserves another client's replacement item. On an idle device, a separate target process verifies release of playback authority before the harness activates the configured screensaver and observes it active for two seconds. If the returning browser wakes the display, cleanup retries activation within a 30-second deadline; an unobserved activation fails the check. This short check does not qualify HDR, audio passthrough, sustained bitrate, or watch-state resume.
 
+For a longer playback check, set `SILO_TEST_FILE_ID` and `SILO_TEST_CONTENT_ID` in your ignored configuration, choose a video longer than eleven minutes, and run:
+
+```sh
+python scripts/dev.py smoke --observe-seconds 600
+```
+
+After pause/seek/resume, this observes the owned player's clock and Kodi's buffering flag every five seconds for ten minutes. It fails if playback stops, is replaced, pauses, reports buffering, or diverges from elapsed time by more than three seconds. It prints progress once per minute and uses the same verified cleanup on success or failure. These sampled observations can miss brief interruptions and do not measure dropped frames, bitrate peaks, or maximum throughput. Qualify HDMI/audio output independently; `VideoPlayer.VideoBitrate` is stream metadata, not a runtime throughput measurement.
+
 Workstation acceptance scripts can reuse `protect_idle_display(args)` from `scripts/dev.py` after stopping their own player and waiting for its disappearance. It never stops a player. A false return means replacement playback appeared and was left alone; an exception means idle protection could not be verified. Call it from cleanup so failed checks also protect the display. Do not start another playback check while Kodi is still showing a playback error or busy dialog from the previous run.
 
 Kodi RPC commands acknowledge requests before all player state is updated. The harness waits for resulting state with a deadline rather than assuming a command response means a completed transition.

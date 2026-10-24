@@ -1,6 +1,6 @@
 # Minimal Silo Kodi client
 
-Status: authentication, browsing, original-stream playback, quality selection with SDR HLS transitions, and text subtitle controls are implemented and undergoing device acceptance. Full playback qualification, combined quality/subtitle workflows, and additional subtitle formats remain unfinished. This document describes the complete intended client, grounded in the Silo v2 contract.
+Status: authentication, browsing, original-stream playback, quality selection with SDR HLS transitions, and text subtitle controls are implemented and undergoing device acceptance. Representative combined quality/subtitle and audio-preservation workflows pass. Broader playback qualification, additional subtitle formats, and the Home milestone remain unfinished. This document describes the complete intended client, grounded in the Silo v2 contract.
 
 ## Requirement and boundaries
 
@@ -110,7 +110,7 @@ A URL alone is insufficient: Silo requires progress heartbeats, including while 
 
 Media requests need current account and profile headers even when the plan supplies a signed stream reference. `stream.headers` deliberately omits the account bearer. Negotiate `header_authenticated_media_v1` when advertised. The relay obtains fresh authority from the shared session store for each GET or HEAD without reopening Kodi. Its resource paths are fixed by the plan, scoped to this attempt, and accessible only over loopback. Stop active transfers and join workers before closing the Silo session and releasing playback authority.
 
-The [media transport design](media-transport.md) records the alternatives, implementation contract, and acceptance evidence. Real credential rotation, long pause, seeking, subtitles, and external replacement pass through the integrated relay. Natural-expiry and sustained-bitrate qualification remain pending.
+The [media transport design](media-transport.md) records the alternatives, implementation contract, and acceptance evidence. Real credential rotation, long pause, seeking, subtitles, and external replacement pass through the integrated relay. A ten-minute high-bitrate original playback window passes sampled clock and buffering checks; the [compatibility matrix](playback-references.md) records measurement limits. Natural expiry, broader bitrate peaks, and render-quality qualification remain pending.
 
 For resume, use the plan's player position. Do not report startup position zero while Kodi is still seeking to the saved point. The target did not honor `StartOffset` reliably; the playback owner explicitly seeks after A/V readiness and waits for the observed position before reporting progress.
 
