@@ -1,6 +1,6 @@
 # Select playback quality without losing position
 
-Status: quality controls, replans, and native player transitions are implemented. The installed add-on passes original → 360p → Auto → 360p through the remote menu, including paused changes and subsequent resume. Capabilities advertise original HTTP and SDR H.264/AAC HLS. Combined subtitle/quality transitions, interruption cases, and broader media qualification remain unfinished.
+Status: quality controls, replans, and native player transitions are implemented. The installed add-on passes original → 360p → Auto → 360p through the remote menu, including paused changes and subsequent resume. Capabilities advertise original HTTP and SDR H.264/AAC HLS. Combined text-subtitle/quality transitions pass representative checks. Native audio selection is lost across quality changes on a multi-audio fixture; reconciliation, interruption cases, and broader media qualification remain unfinished.
 
 ## Requirement and ownership
 
@@ -49,6 +49,25 @@ Kodi broadcasts player callbacks to all registered Python Player instances, and 
 After readiness, restore the plan's player position, wait for the observed clock to settle, apply the subtitle decision, and restore pause. Do not report startup zero as a new watch position. Only publish the completed UI selection after the player reaches the intended state. If the committed plan cannot be opened, report the failure and clean up the owned session rather than continuing with stale server identity.
 
 Apply this transition to every replan involving transcoded HLS, including subtitle-only changes. The target retained old segment URLs after a subtitle replan; a subsequent seek received 404 for a retired grant. Reopening creates a new demuxer that consumes the new playlist. Keep grant retirement in the relay instead of extending old-plan authority to accommodate a cached playlist. Original-to-original sidecar changes can keep the player open.
+
+## Preserve the selected soundtrack
+
+The installed-player regression selects a nondefault AC3 soundtrack, pauses, changes to 360p, then returns to Auto. Position and pause survive, but the returned original selects DTS-HD MA instead of AC3. Copying the previous plan's `selected_tracks` does not capture a choice made through Kodi's audio controls. Kodi can also retain a native choice across playback starts, independently of the server's initial selection.
+
+Keep reconciliation in the playback owner. Before a quality or subtitle replan, observe the current native audio selection and map it to the source inventory. Submit that identity with the same replan rather than starting a second session or performing a separate track-change mutation. After reopening an original file, select the corresponding native stream and observe it selected before publishing a completed transition. For packaged HLS, retain the plan's source identity; its single delivered audio stream does not have the source's index.
+
+The required source inventory is available from the catalog item's versions response, not the playback plan. Carry the content ID from browsing into the playback route, fetch the matching file's inventory under the playback profile, and keep it scoped to that invocation. Do not persist a second catalog or infer content identity from a file name.
+
+Kodi's JSON-RPC audio index is an ordinal in the current player's audio list. Silo's index is an ordinal in the probed source audio inventory. These often align for ordinary original files, but Kodi can select one program from a multi-program container while Silo probes all streams. Do not use index equality as identity. Match source metadata against observed native streams, accepting only an unambiguous correspondence:
+
+- Account for Kodi's DTS codec names, such as `dtshd_ma` and `dca`, versus ffprobe's `dts`.
+- Normalize recognized language codes with Kodi's language conversion. Unknown values must not become equal solely because conversion returns an empty string.
+- Compare channel count and available title/profile evidence. Kodi decorates embedded titles with a stream-type suffix; repeated or absent titles are not unique identities.
+- Treat default flags as metadata, not evidence that the default stream is currently selected. Reject unresolved matches before a replan, leave the current playback running, and explain why the requested transition is unavailable.
+
+Silo's `client_selected_audio_track_v1` claim on `original_http` permits a nondefault source soundtrack without requiring a remux. Advertise it only with the native selection and verification implementation. A server probe carried the nondefault source identity through 360p HLS and back to original with this claim; that proves negotiation support, not that the installed player preserves the soundtrack. Do not add the claim to HLS or apply a source ordinal to its packaged audio list.
+
+Acceptance must include original → HLS → original with a nondefault soundtrack, a paused transition, subtitle replans, a reordered native inventory, ambiguous metadata, and replacement playback during selection. Independently observe the final selected native stream and preserved position; a successful server response alone does not prove restoration.
 
 ## Evidence and remaining acceptance
 
