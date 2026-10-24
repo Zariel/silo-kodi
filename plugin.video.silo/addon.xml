@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<addon id="plugin.video.silo" name="Silo" version="0.2.0" provider-name="silo-kodi contributors">
+<addon id="plugin.video.silo" name="Silo" version="0.3.0" provider-name="silo-kodi contributors">
   <requires>
     <import addon="xbmc.python" version="3.0.1" />
   </requires>
@@ -8,7 +8,7 @@
   </extension>
   <extension point="xbmc.addon.metadata">
     <summary lang="en_GB">Browse and play media from Silo</summary>
-    <description lang="en_GB">Sign in to Silo using a QR code, choose a profile, and browse your libraries, movies, series, seasons, and episodes. Playback is under development.</description>
+    <description lang="en_GB">Sign in using a QR code, choose a profile, browse libraries, and play supported original SDR video through Kodi. HDR, quality selection, and subtitle controls are under development.</description>
     <platform>all</platform>
     <license>MIT</license>
   </extension>

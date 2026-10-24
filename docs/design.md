@@ -1,6 +1,6 @@
 # Minimal Silo Kodi client
 
-Status: authentication and browsing are implemented and undergoing device acceptance. Playback remains planned. This document describes the complete intended client, grounded in the Silo v2 contract.
+Status: authentication, browsing, and initial original-stream playback are implemented and undergoing device acceptance. Full playback qualification, quality selection, and subtitles remain unfinished. This document describes the complete intended client, grounded in the Silo v2 contract.
 
 ## Requirement and boundaries
 
@@ -94,7 +94,11 @@ Kodi should select embedded audio/subtitle tracks from the unchanged container. 
 
 ### Session lifetime
 
-A URL alone is insufficient: Silo requires progress heartbeats, including while paused. The first implementation will keep the playback plugin invocation alive with an `xbmc.Player`/`xbmc.Monitor` loop after resolution. This invocation owns one session, its immutable profile authority, its sequence counter, and its stop identifier. It sends progress every 10 seconds and observes Kodi's actual position and pause state. The target spike must prove the interpreter survives resolution and UI navigation before relying on this ownership model; if it cannot, move this responsibility into one bundled Kodi service, rather than duplicating it across UI callbacks.
+A URL alone is insufficient: Silo requires progress heartbeats, including while paused. A separate playback plugin invocation stays alive with an `xbmc.Player`/`xbmc.Monitor` loop after resolution; the browsing window does not own it. This invocation owns one session, its profile authority, its sequence counter, and its stop identifier. It sends progress every 10 seconds and observes Kodi's actual position and pause state. A process lock prevents another playback owner or account/profile/server mutation until final stop completes. The initial target test observed playback beyond 60 seconds and persisted progress, but failure and replacement acceptance remain incomplete. If invocation lifetime proves unreliable, move this responsibility into one bundled Kodi service rather than duplicating it across UI callbacks.
+
+Media requests need current account and profile headers even when the plan supplies a signed stream reference. `stream.headers` deliberately omits the account bearer. Negotiate `header_authenticated_media_v1` when advertised, validate that media stays on the API origin, then attach current authority through Kodi's HTTP header options. Cross-origin media and mid-playback credential replacement are not yet supported. Do not advertise those capabilities until their lifecycle is implemented and tested.
+
+For resume, use the plan's player position. Do not report startup position zero while Kodi is still seeking to the saved point. The target did not honor `StartOffset` reliably; the playback owner explicitly seeks after A/V readiness and waits for the observed position before reporting progress.
 
 V2 progress is `POST /playback/{session_id}/progress` with `installation_id`, monotonically increasing `sequence`, `position`, and `is_paused`. Stop is `DELETE /playback/{session_id}` with `installation_id`, stable `stop_id`, and optional final sequenced position. Retry an uncertain mutation using the same identifiers and body. A later observation gets a later sequence. Use the same start attempt/body when recovering an interrupted start; do not create duplicate sessions on a network timeout.
 

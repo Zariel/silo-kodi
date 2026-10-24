@@ -2,6 +2,7 @@
 from pathlib import Path
 import re
 import threading
+from urllib.parse import urlencode
 
 import xbmc
 import xbmcaddon
@@ -27,6 +28,12 @@ class BrowserWindow(xbmcgui.WindowXML):
         self.worker = None
 
     def onInit(self):
+        if self.page:
+            def restore():
+                self._menu()
+                self._show(self.page)
+            self._task(restore)
+            return
         self.setProperty('accent', 'FFE8E8EC')
         self._task(self._load)
 
@@ -62,6 +69,14 @@ class BrowserWindow(xbmcgui.WindowXML):
         self.libraries = self.catalog.libraries()
         if self.closed.is_set():
             return
+        self._menu()
+        if self.libraries:
+            self._library(self.libraries[0])
+        else:
+            self.getControl(12).setLabel('No video libraries available')
+            self.setFocusId(100)
+
+    def _menu(self):
         menu = self.getControl(100)
         menu.reset()
         for library in self.libraries:
@@ -69,11 +84,6 @@ class BrowserWindow(xbmcgui.WindowXML):
         menu.addItem(xbmcgui.ListItem('Account'))
         menu.addItem(xbmcgui.ListItem('Close'))
         self.getControl(11).setLabel(_text(self.session.status()['profile']['name']))
-        if self.libraries:
-            self._library(self.libraries[0])
-        else:
-            self.getControl(12).setLabel('No video libraries available')
-            self.setFocusId(100)
 
     def _library(self, library):
         data = self.catalog.page(library['id'])
@@ -156,18 +166,21 @@ class BrowserWindow(xbmcgui.WindowXML):
                         self.getControl(210).addItem(card)
                 else:
                     self.getControl(300).setVisible(True)
-                    self.getControl(300).setEnabled(False)
+                    self.getControl(300).setEnabled(True)
                     self.getControl(300).setLabel('Play')
-                    self.getControl(21).setLabel(_text('  •  '.join(metadata + ['Playback is not available in this build'])))
         control = self.getControl(control_id)
         control.selectItem(page.get('selection', 0))
-        focus = page.get('focus', control_id if control.size() else 301 if kind != 'library' else 100)
+        playable = kind == 'item' and page['data']['type'] in ('movie', 'episode')
+        focus = page.get('focus', 300 if playable else control_id if control.size() else 301 if kind != 'library' else 100)
         self.setFocusId(focus)
-        destination = control_id if control.size() else 301 if kind != 'library' else 100
+        destination = 300 if playable else control_id if control.size() else 301 if kind != 'library' else 100
         self.getControl(100).controlRight(self.getControl(destination))
         self.getControl(301).controlRight(self.getControl(control_id if control.size() else 100))
         self.getControl(301).controlUp(self.getControl(control_id if control.size() else 100))
         self.getControl(301).controlDown(self.getControl(control_id if control.size() else 100))
+        if playable:
+            self.getControl(301).controlUp(self.getControl(300))
+            self.getControl(300).controlRight(self.getControl(301))
 
     def _detail(self, content_id):
         data = self.catalog.item(content_id)
@@ -191,6 +204,24 @@ class BrowserWindow(xbmcgui.WindowXML):
         known = {item['content_id'] for item in page['items']}
         items = page['items'] + [item for item in data['items'] if item['content_id'] not in known]
         self._show(dict(page, items=items, next_cursor=data['next_cursor']))
+
+    def _play(self):
+        if xbmc.Player().isPlaying():
+            raise Error('playback_active')
+        data = self.page['data']
+        versions = [version for version in self.catalog.versions(data['content_id']) if not version.get('unreadable')]
+        if not versions:
+            raise Error('unsupported_playback')
+        index = 0
+        if len(versions) > 1:
+            labels = [' · '.join(str(version.get(key) or '') for key in ('resolution', 'codec_video', 'codec_audio', 'container')) for version in versions]
+            index = xbmcgui.Dialog().select('Choose version', labels)
+        if index < 0 or self.closed.is_set():
+            return
+        query = {'action': 'play', 'profile': self.catalog.profile_id,
+                 'file': versions[index]['file_id'], 'title': data.get('title') or 'Silo'}
+        self._remember()
+        xbmc.Player().play('plugin://plugin.video.silo/?' + urlencode(query))
 
     def _back(self):
         if self.busy:
@@ -232,6 +263,8 @@ class BrowserWindow(xbmcgui.WindowXML):
                 self._task(lambda: self._detail(content_id))
         elif control == 301:
             self._back()
+        elif control == 300:
+            self._task(self._play)
 
     def onAction(self, action):
         if action.getId() in (9, 10, 92):

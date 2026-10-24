@@ -1,6 +1,6 @@
 # Test on CoreELEC
 
-Use the development loop below to validate code through the actual Kodi interpreter and player. The browsing build provides library grids and detail screens, a Kodi account screen, and a headless helper using the same credential store and API client. Silo media playback remains unimplemented; the player smoke test uses a temporary local silent WAV.
+Use the development loop below to validate code through the actual Kodi interpreter and player. The client provides library and detail screens, account authentication, and initial original SDR playback. The legacy player smoke test uses a temporary local silent WAV; it does not qualify Silo playback.
 
 ## Prerequisites
 
@@ -60,7 +60,7 @@ Before sharing logs after authentication is implemented, redact signed stream UR
 
 After signing in and choosing a profile, open Silo to show the first video library. Use the left navigation to change library or open **Account**. Moving right returns to the content selection. Choose a poster to open its details, a season to show episodes, and an episode to show its details. **Back** restores the preceding screen and selection.
 
-Scroll to **Load more** after the first 50 titles and select it. Verify that another page appears and focus remains at the first appended card. Open that card and go Back; the loaded page and selection must remain. Empty libraries and unavailable artwork must not prevent navigation. The **Play** button is disabled in the browsing build.
+Scroll to **Load more** after the first 50 titles and select it. Verify that another page appears and focus remains at the first appended card. Open that card and go Back; the loaded page and selection must remain. Empty libraries and unavailable artwork must not prevent navigation. **Play** requests an original stream; the initial decoder declaration is limited to SDR at up to 1080p. This is an implementation boundary, not the hardware's maximum capability.
 
 Switch profiles through **Account** and return to browsing. The client must rebuild the library root for the selected profile rather than restore the previous profile's history. Screenshots and private catalog evidence belong in ignored local storage.
 
@@ -101,7 +101,7 @@ python scripts/dev.py browse
 
 ## Qualify real Silo playback
 
-This is the acceptance procedure for the client implementation, not a claim that the scaffold passes it.
+This is the acceptance procedure for the complete client, not a claim that the development build passes every step. The initial original-stream test establishes decoding and progress persistence only. Slow seeking was observed and remains unresolved. Mid-playback media credential refresh, resume acceptance, episode playback, output qualification, and failure/replacement checks remain open.
 
 1. Approve device sign-in in your existing Silo browser session. Use two account profiles and a PIN-protected profile for authority tests. An admin API key is neither required nor a substitute for account sign-in.
 2. Browse a library with more than 50 entries and a series with multiple seasons. Compare access and metadata to the Silo web UI. Switch profile, revisit an old navigation entry, and verify it cannot play with stale authority.

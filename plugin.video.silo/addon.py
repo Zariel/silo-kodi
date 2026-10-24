@@ -17,6 +17,16 @@ def main():
     handle = int(sys.argv[1]) if len(sys.argv) > 1 and sys.argv[1].isdigit() else -1
     query = parse_qs(sys.argv[2].lstrip('?')) if len(sys.argv) > 2 else {}
     action = query.get('action', [''])[0]
+    if action == 'play':
+        from silo.player import play
+        directory = xbmcvfs.translatePath(xbmcaddon.Addon().getAddonInfo('profile'))
+        session = Session.open(directory)
+        if session and all(key in query for key in ('profile', 'file')):
+            play(handle, session, query['profile'][0], query['file'][0], query.get('title', ['Silo'])[0],
+                 0 if query.get('restart') == ['true'] else None, sys.argv[0] + sys.argv[2])
+        else:
+            xbmcplugin.setResolvedUrl(handle, False, xbmcgui.ListItem())
+        return
     if action == 'smoke':
         path = 'special://temp/silo-kodi-smoke.wav'
         item = xbmcgui.ListItem(path=path)
