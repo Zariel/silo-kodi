@@ -89,8 +89,6 @@ def play(handle, session, profile_id, file_id, title, start_position=None, sourc
                             player.seekTime(start)
                             seek_deadline = time.monotonic() + 45
                         elif time.monotonic() > seek_deadline:
-                            if player.isPlaying() and _owns(player, url, source):
-                                player.stop()
                             raise Error('unsupported_playback')
                         if resume_pending:
                             monitor.waitForAbort(.25)
@@ -108,8 +106,6 @@ def play(handle, session, profile_id, file_id, title, start_position=None, sourc
                             attempt.sample(last_position, paused)
                         except Error as exc:
                             if attempt.ended or exc.status in (401, 403) or exc.code == 'sign_in_required':
-                                if player.isPlaying() and _owns(player, url, source):
-                                    player.stop()
                                 break
                             xbmc.log('Silo: progress temporarily unavailable', xbmc.LOGWARNING)
                         next_report = time.monotonic() + 10
@@ -117,6 +113,14 @@ def play(handle, session, profile_id, file_id, title, start_position=None, sourc
                 if player.completed and duration:
                     last_position = duration
             finally:
+                # Close the player before revoking its stream, including failures
+                # after resolution. A replacement belongs to its new caller.
+                if resolved:
+                    try:
+                        if player.isPlaying() and _owns(player, url, source):
+                            player.stop()
+                    except RuntimeError:
+                        pass
                 if attempt:
                     try:
                         xbmc.log('Silo: closing playback session', xbmc.LOGINFO)
