@@ -198,6 +198,43 @@ def wait_for(observe, ready, timeout=20):
         time.sleep(0.2)
 
 
+def protect_idle_display(args):
+    """Verify idle protection after a check; preserve replacement playback."""
+    probe = """
+import sys
+sys.path.insert(0, '/storage/.kodi/addons/plugin.video.silo/resources/lib')
+from silo.client import Session, Error
+session = Session.open('/storage/.kodi/userdata/addon_data/plugin.video.silo')
+try:
+    with session.store.playback_lock(): print('released')
+except Error as exc:
+    print(exc.code)
+"""
+    deadline = time.monotonic() + 30
+    released = False
+    active_since = None
+    while time.monotonic() < deadline:
+        if rpc(args, "Player.GetActivePlayers"):
+            return False
+        if not released:
+            released = remote_python(args, probe).strip() == 'released'
+        if released:
+            active = rpc(args, "XBMC.GetInfoBooleans", {
+                "booleans": ["System.ScreenSaverActive"]})["System.ScreenSaverActive"]
+            if active:
+                if active_since is None:
+                    active_since = time.monotonic()
+                elif time.monotonic() - active_since >= 2:
+                    return True
+            else:
+                active_since = None
+                # The returning browser can wake the display after player stop.
+                # Observe protection after activation instead of trusting its ACK.
+                ssh(args, 'kodi-send --action=ActivateScreensaver')
+        time.sleep(.5)
+    raise RuntimeError("Idle display protection did not settle after playback cleanup")
+
+
 def smoke(args):
     idle(args)
     profile = json.loads(remote_python(args, """
@@ -263,20 +300,10 @@ print(json.dumps(session.status().get('profile') if session else None))
         if player is not None:
             rpc(args, "Player.Stop", {"playerid": player})
         wait_for(owned_player, lambda player: player is None)
-        if not rpc(args, "Player.GetActivePlayers"):
-            ssh(args, 'kodi-send --action=ActivateScreensaver')
-    probe = """
-import sys
-sys.path.insert(0, '/storage/.kodi/addons/plugin.video.silo/resources/lib')
-from silo.client import Session, Error
-session = Session.open('/storage/.kodi/userdata/addon_data/plugin.video.silo')
-try:
-    with session.store.playback_lock(): print('released')
-except Error as exc:
-    print(exc.code)
-"""
-    wait_for(lambda: remote_python(args, probe).strip(), lambda value: value == 'released', timeout=30)
-    print("Player stopped and playback authority released: OK")
+        if protect_idle_display(args):
+            print("Player stopped, playback authority released, and screensaver observed: OK")
+        else:
+            print("Replacement playback preserved; display protection left to Kodi")
 
 
 def main():
