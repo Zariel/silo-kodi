@@ -98,6 +98,8 @@ A URL alone is insufficient: Silo requires progress heartbeats, including while 
 
 Media requests need current account and profile headers even when the plan supplies a signed stream reference. `stream.headers` deliberately omits the account bearer. Negotiate `header_authenticated_media_v1` when advertised, validate that media stays on the API origin, then attach current authority through Kodi's HTTP header options. Cross-origin media and mid-playback credential replacement are not yet supported. Do not advertise those capabilities until their lifecycle is implemented and tested.
 
+The [media transport design](media-transport.md) selects a scoped loopback relay for renewal without reopening playback. A target prototype establishes range and credential-rotation feasibility; integration and long-session acceptance remain pending.
+
 For resume, use the plan's player position. Do not report startup position zero while Kodi is still seeking to the saved point. The target did not honor `StartOffset` reliably; the playback owner explicitly seeks after A/V readiness and waits for the observed position before reporting progress.
 
 V2 progress is `POST /playback/{session_id}/progress` with `installation_id`, monotonically increasing `sequence`, `position`, and `is_paused`. Stop is `DELETE /playback/{session_id}` with `installation_id`, stable `stop_id`, and optional final sequenced position. Retry an uncertain mutation using the same identifiers and body. A later observation gets a later sequence. Use the same start attempt/body when recovering an interrupted start; do not create duplicate sessions on a network timeout.
