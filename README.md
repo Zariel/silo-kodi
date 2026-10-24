@@ -34,8 +34,9 @@ Open a title's options with your remote's Menu button, a long press of Select if
 - Mark a title watched or unwatched.
 - Add or remove favourites.
 - Add or remove watchlist entries.
+- Remove a card from Continue Watching or Next Up when offered.
 
-Marking a TV show watched or unwatched applies to all its episodes.
+Marking a TV show watched or unwatched applies to all its episodes. Removing an episode from Continue Watching or Next Up hides its whole show from both rows until you watch it again; it does not mark the show watched.
 
 ## Watch
 

@@ -332,7 +332,7 @@ class HomeNavigation(unittest.TestCase):
         self.catalog.set_state.return_value = dict(self.card('3'), user_state={
             'played': False, 'is_favorite': False, 'in_watchlist': False})
         dialog = Mock()
-        dialog.contextmenu.return_value = 3
+        dialog.contextmenu.return_value = 2
         globals_ = self.window.onClick.__globals__
         with patch.object(globals_['xbmcgui'], 'Dialog', return_value=dialog, create=True):
             self.window.onAction(SimpleNamespace(getId=lambda: 117))
@@ -348,5 +348,71 @@ class HomeNavigation(unittest.TestCase):
         globals_ = self.window.onClick.__globals__
         with patch.object(globals_['xbmcgui'], 'Dialog', return_value=dialog, create=True):
             self.window.onAction(SimpleNamespace(getId=lambda: 117))
-        self.assertEqual(dialog.contextmenu.call_args.args[0], ['Details', 'Play / Resume'])
+        self.assertEqual(dialog.contextmenu.call_args.args[0], ['Play / Resume', 'Details'])
         self.catalog.set_state.assert_not_called()
+
+
+    def test_home_removal_uses_card_anchor_and_refreshes_membership(self):
+        self.rows['first']['section_type'] = 'continue_watching'
+        self.rows['first']['items'][0].update(progress_updated_at='2026-10-24T10:00:00Z', series_id='show')
+        self.open_home()
+        dialog = Mock()
+        def choose(labels):
+            return labels.index('Remove from Continue Watching')
+        dialog.contextmenu.side_effect = choose
+        def dismiss(*args):
+            self.rows['first']['items'] = [self.card('b')]
+        self.catalog.dismiss_home.side_effect = dismiss
+        globals_ = self.window.onClick.__globals__
+        with patch.object(globals_['xbmcgui'], 'Dialog', return_value=dialog, create=True):
+            self.window.onAction(SimpleNamespace(getId=lambda: 117))
+        self.catalog.dismiss_home.assert_called_once_with('a', 'continue_watching', '2026-10-24T10:00:00Z')
+        self.assertEqual(self.window.getControl(230).items[0].label, 'b')
+        self.assertEqual(self.window.getFocusId(), 230)
+        self.catalog.set_state.assert_not_called()
+
+    def test_next_up_removal_discards_inflight_page(self):
+        row = dict(self.rows['first'], section_type='next_up')
+        self.catalog.home_page.return_value = {
+            'items': [dict(self.card('a'), type='episode', series_id='show')], 'next_cursor': 'old'}
+        self.window._section(row)
+        old_page = self.window.page
+        dialog = Mock()
+        dialog.contextmenu.side_effect = lambda labels: labels.index('Remove from Next Up')
+        def fetch(section, cursor=None):
+            if cursor:
+                self.window.onAction(SimpleNamespace(getId=lambda: 117))
+                return {'items': [self.card('stale')], 'next_cursor': 'old-next'}
+            return {'items': [self.card('b')], 'next_cursor': 'new'}
+        self.catalog.home_page.side_effect = fetch
+        globals_ = self.window.onClick.__globals__
+        with patch.object(globals_['xbmcgui'], 'Dialog', return_value=dialog, create=True):
+            self.window._prefetch()
+        self.catalog.dismiss_home.assert_called_once_with('a', 'next_up', 'show')
+        self.assertIsNot(self.window.page, old_page)
+        self.assertEqual([item.label for item in self.window.getControl(200).items], ['b'])
+        self.assertEqual(self.window.page['next_cursor'], 'new')
+
+    def test_home_removal_requires_progress_row_and_anchor(self):
+        dialog = Mock()
+        dialog.contextmenu.return_value = -1
+        globals_ = self.window.onClick.__globals__
+        for section_type, anchor in (('recently_added', {'series_id': 'show'}),
+                                     ('next_up', {}), ('continue_watching', {'progress_updated_at': ' '})):
+            with self.subTest(section_type=section_type, anchor=anchor):
+                self.rows['first']['section_type'] = section_type
+                self.rows['first']['items'] = [dict(self.card('a'), **anchor)]
+                self.open_home()
+                with patch.object(globals_['xbmcgui'], 'Dialog', return_value=dialog, create=True):
+                    self.window.onAction(SimpleNamespace(getId=lambda: 117))
+                self.assertFalse(any(label.startswith('Remove from') for label in dialog.contextmenu.call_args.args[0]))
+        self.catalog.dismiss_home.assert_not_called()
+
+    def test_sidebar_and_season_cards_do_not_target_detail_title(self):
+        self.open_home()
+        self.window.onClick(230)
+        self.catalog.item.reset_mock()
+        for focus in (100, 301, 210):
+            self.window.setFocusId(focus)
+            self.window.onAction(SimpleNamespace(getId=lambda: 117))
+        self.catalog.item.assert_not_called()

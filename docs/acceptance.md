@@ -50,3 +50,9 @@ The local suite passes 130 tests. The installed package passed SHA-256 verificat
 - Ambiguous native track metadata is rejected rather than guessing. Multipart chaining and library-specific presentation context are not implemented.
 - Extended media-network outages, untested media variants, and broader peak-bitrate/render-quality coverage remain unqualified. Synthetic expiry is the repeatable renewal gate; waiting for natural wall-clock expiry is optional additional coverage.
 - Releases are manually installed ZIPs. A Kodi repository feed for automatic updates, standalone music, offline downloads, discovery, catalog synchronization, and full mobile-client feature parity are outside this initial client.
+
+## TV title actions
+
+The installed add-on opens its title menu through Kodi's synthetic held-Enter input (`Input.ButtonEvent`, keyboard map, 1000 ms). Cancel leaves playback stopped and Home unchanged. Removing a movie from Continue Watching removes it from the displayed shelf and an independent server section read; the test then undismisses it and verifies membership is restored. Favourite add/remove is verified through the independent favourites endpoint, with original state and selection restored. Both checks end with idle display protection.
+
+The automated suite passes 135 tests, including dismissal anchors, profile ownership, menu targeting, and rejection of an older in-flight page after Home membership changes. Next Up and whole-show dismissal have contract coverage but were not mutated on the user's profile. Physical remote hold behaviour still depends on its Kodi key mapping.

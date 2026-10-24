@@ -259,3 +259,23 @@ class SearchAndActions(unittest.TestCase):
         session.request.side_effect = [None, {'user_state': {'is_favorite': False}}]
         with self.assertRaises(Error):
             Catalog(session).set_state('movie/id', 'is_favorite', True)
+
+
+    def test_home_dismissal_preserves_anchor_and_profile(self):
+        from unittest.mock import Mock
+        session = Mock()
+        session.status.return_value = {'profile': {'id': 'viewer'}}
+        catalog = Catalog(session)
+        catalog.dismiss_home('episode/a', 'continue_watching', '2026-10-24T10:00:00.123Z')
+        session.request.assert_called_once_with(
+            'PUT', '/home/dismissals/continue_watching/episode%2Fa',
+            {'progress_updated_at': '2026-10-24T10:00:00.123Z'}, expected_profile='viewer')
+        session.request.reset_mock()
+        catalog.dismiss_home('episode/a', 'next_up', 'show/b')
+        session.request.assert_called_once_with(
+            'PUT', '/home/dismissals/next_up/episode%2Fa', {'series_id': 'show/b'}, expected_profile='viewer')
+        session.request.reset_mock()
+        for surface, anchor in (('other', 'show'), ('next_up', ''), ('continue_watching', None)):
+            with self.subTest(surface=surface, anchor=anchor), self.assertRaises(Error):
+                catalog.dismiss_home('episode/a', surface, anchor)
+        session.request.assert_not_called()

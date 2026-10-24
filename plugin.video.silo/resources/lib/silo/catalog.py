@@ -141,6 +141,15 @@ class Catalog:
     def item(self, content_id):
         return self._get('/catalog/items/' + quote(str(content_id), safe=''))
 
+    def dismiss_home(self, content_id, surface, anchor):
+        field = {'continue_watching': 'progress_updated_at', 'next_up': 'series_id'}.get(surface)
+        if not field or not isinstance(anchor, str) or not anchor.strip():
+            raise Error('invalid_response')
+        # Use the observed card's anchor: newer progress must not be hidden by
+        # a menu opened against an older snapshot.
+        self.session.request('PUT', '/home/dismissals/' + surface + '/' + quote(str(content_id), safe=''),
+                             {field: anchor}, expected_profile=self.profile_id)
+
     def seasons(self, series_id):
         return self._get('/catalog/series/' + quote(str(series_id), safe='') + '/seasons')['items']
 

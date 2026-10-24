@@ -172,7 +172,8 @@ class BrowserWindow(xbmcgui.WindowXML):
 
     def _section(self, row):
         data = self.catalog.home_page(row['id'])
-        self._push(dict(data, kind='section', title=row['title'], section=row['id']))
+        self._push(dict(data, kind='section', title=row['title'], section=row['id'],
+                        section_type=row.get('section_type')))
 
     def _library(self, library):
         data = self.catalog.page(library['id'])
@@ -198,14 +199,29 @@ class BrowserWindow(xbmcgui.WindowXML):
             rows = self.page.get('visible', [])
             slot = focus - 230
             items = rows[slot][1]['items'] if slot < len(rows) else []
-        elif focus in (200, 210, 220):
+        elif focus in (200, 220):
             items = self.page.get('items', [])
-        elif self.page['kind'] == 'item':
+        elif focus == 300 and self.page['kind'] == 'item':
             return self.page['data']
         else:
             return None
         index = self.getControl(focus).getSelectedPosition()
         return items[index] if 0 <= index < len(items) else None
+
+    def _home_dismissal(self, selected):
+        section_type = self.page.get('section_type')
+        if self.page['kind'] == 'home':
+            slot = self.getFocusId() - 230
+            section_type = self.page['visible'][slot][1].get('section_type')
+        if section_type not in ('continue_watching', 'in_progress', 'next_up'):
+            return None
+        for surface, field, label in (
+                ('continue_watching', 'progress_updated_at', 'Remove from Continue Watching'),
+                ('next_up', 'series_id', 'Remove from Next Up')):
+            anchor = selected.get(field)
+            if isinstance(anchor, str) and anchor.strip():
+                return surface, anchor, label
+        return None
 
     def _context(self):
         selected = self._selected()
@@ -215,7 +231,7 @@ class BrowserWindow(xbmcgui.WindowXML):
                 playback_options()
             return
         data = self.catalog.item(selected['content_id'])
-        choices = [('Details', 'detail')]
+        choices = []
         if data['type'] in ('movie', 'episode'):
             choices.append(('Play / Resume', 'play'))
         state = data.get('user_state') or {}
@@ -227,6 +243,10 @@ class BrowserWindow(xbmcgui.WindowXML):
                 if field == 'played' and data['type'] == 'series':
                     label += ' (all episodes)'
                 choices.append((label, field))
+        dismissal = self._home_dismissal(selected)
+        if dismissal:
+            choices.append((dismissal[2], 'dismiss'))
+        choices.append(('Details', 'detail'))
         if playing:
             choices.append(('Playback options', 'playback'))
         self.getControl(20).setLabel('')
@@ -236,6 +256,10 @@ class BrowserWindow(xbmcgui.WindowXML):
         action = choices[choice][1]
         if action == 'playback':
             playback_options()
+        elif action == 'dismiss':
+            self.catalog.dismiss_home(data['content_id'], dismissal[0], dismissal[1])
+            self._refresh_action()
+            xbmcgui.Dialog().notification('Silo', 'Removed from Home', time=1500, sound=False)
         elif action in ('detail', 'play'):
             if self.page['kind'] != 'item' or self.page['data']['content_id'] != data['content_id']:
                 self._detail(data['content_id'])
@@ -244,9 +268,22 @@ class BrowserWindow(xbmcgui.WindowXML):
         else:
             fresh = self.catalog.set_state(data['content_id'], action, not state[action])
             selected.update(fresh)
-            self._remember()
-            self._show(self.page)
+            self._refresh_action()
             xbmcgui.Dialog().notification('Silo', 'Updated', time=1500, sound=False)
+
+    def _refresh_action(self):
+        self._remember()
+        page = self.page
+        if page['kind'] == 'section':
+            selected = self._selected()
+            fresh = self.catalog.home_page(page['section'])
+            # A new page identity also invalidates an in-flight prefetch from
+            # before the mutation. The server owns membership and ordering.
+            page = dict(fresh, kind='section', title=page['title'], section=page['section'],
+                        section_type=page.get('section_type'))
+            page['selection'] = next((i for i, item in enumerate(page['items'])
+                                      if selected and item['content_id'] == selected['content_id']), 0)
+        self._show(page)
 
     def _remember(self):
         if self.page:
