@@ -28,6 +28,22 @@ class Audio(unittest.TestCase):
         self.assertEqual(self.source.native_index(identity, self.streams), 0)
         self.assertEqual(self.source.identity(self.streams, 1), {'id': 'file:42:audio:0', 'index': 0})
 
+    def test_profile_codec_names_match_the_source_family(self):
+        for source_codec, native_codec in (('truehd', 'truehd_atmos'), ('eac3', 'eac3_ddp_atmos'),
+                                           ('dts', 'dtshd_ma_x'), ('aac', 'he_aac_v2')):
+            with self.subTest(codec=native_codec):
+                source = SourceAudio('42', [{'codec': source_codec, 'channels': 8}], language)
+                streams = [{'index': 2, 'codec': native_codec, 'channels': 8}]
+                identity = {'id': 'file:42:audio:0', 'index': 0}
+                self.assertEqual(source.identity(streams, 2), identity)
+                self.assertEqual(source.native_index(identity, streams), 2)
+
+    def test_unknown_profiles_and_different_families_are_not_guessed(self):
+        source = SourceAudio('42', [{'codec': 'truehd', 'channels': 8}], language)
+        for codec in ('truehd_unknown', 'eac3_ddp_atmos'):
+            with self.subTest(codec=codec), self.assertRaises(Error):
+                source.identity([{'index': 0, 'codec': codec, 'channels': 8}], 0)
+
     def test_ambiguous_source_and_native_metadata_are_rejected(self):
         self.source.tracks.append(dict(self.source.tracks[1]))
         with self.assertRaises(Error):

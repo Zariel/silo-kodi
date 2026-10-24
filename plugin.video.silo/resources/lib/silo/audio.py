@@ -2,6 +2,19 @@
 from .client import Error
 
 
+_CODEC_FAMILIES = {
+    name: family
+    for family, names in (
+        ('dts', ('dca', 'dts_96_24', 'dts_es', 'dts_express', 'dtshd_hra',
+                 'dtshd_ma', 'dtshd_ma_x', 'dtshd_ma_x_imax')),
+        ('aac', ('aac_lc', 'he_aac', 'he_aac_v2', 'aac_ssr', 'aac_ltp')),
+        ('truehd', ('truehd_atmos',)),
+        ('eac3', ('eac3_ddp_atmos',)),
+    )
+    for name in names
+}
+
+
 class SourceAudio:
     def __init__(self, file_id, tracks, language):
         self.file_id = str(file_id)
@@ -10,8 +23,8 @@ class SourceAudio:
 
     def _matches(self, source, native):
         codec = native.get('codec')
-        if codec in ('dca', 'dtshd_ma', 'dtshd_hra'):
-            codec = 'dts'
+        # Kodi can expose a codec profile where ffprobe supplies its family.
+        codec = _CODEC_FAMILIES.get(codec, codec)
         if not source.get('codec') or source['codec'] != codec:
             return False
         if not source.get('channels') or source['channels'] != native.get('channels'):

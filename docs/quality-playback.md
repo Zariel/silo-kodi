@@ -60,7 +60,7 @@ The required source inventory is available from the catalog item's versions resp
 
 Kodi's JSON-RPC audio index is an ordinal in the current player's audio list. Silo's index is an ordinal in the probed source audio inventory. These often align for ordinary original files, but Kodi can select one program from a multi-program container while Silo probes all streams. Do not use index equality as identity. Match source metadata against observed native streams, accepting only an unambiguous correspondence:
 
-- Account for Kodi's DTS codec names, such as `dtshd_ma` and `dca`, versus ffprobe's `dts`.
+- Normalize Kodi's documented codec-profile names to the source family before matching. This includes DTS variants, AAC profiles, `truehd_atmos`, and `eac3_ddp_atmos`. Keep unknown names distinct. A target build reported `truehd_atmos` for a source probed as `truehd`; assuming only DTS needed normalization rejected valid original playback.
 - Normalize recognized language codes with Kodi's language conversion. Unknown values must not become equal solely because conversion returns an empty string.
 - Compare channel count and available title/profile evidence. Kodi decorates embedded titles with a stream-type suffix; repeated or absent titles are not unique identities.
 - Treat default flags as metadata, not evidence that the default stream is currently selected. Reject unresolved matches before a replan, leave the current playback running, and explain why the requested transition is unavailable.
@@ -95,6 +95,7 @@ The full acceptance scope remains:
 
 ## References
 
+- [Kodi audio codec names](https://kodi.wiki/view/InfoLabel#VideoPlayer.AudioCodec).
 - [Silo quality and timeline contract](https://github.com/Silo-Server/silo-server/blob/489fe4d55735f3855b2a0d6276e57d148891b456/docs/architecture/playback-protocol-v3.md).
 - [Android server-owned quality menu](https://github.com/Silo-Server/silo-android/blob/0545b85deb3be6c32868200a7b2b3edbd3ab02ef/shared/src/commonMain/kotlin/org/siloserver/silo/model/playback/PlaybackQualityMenu.kt).
 - [Android replan and server-plan ownership](https://github.com/Silo-Server/silo-android/blob/0545b85deb3be6c32868200a7b2b3edbd3ab02ef/android-shared/src/androidMain/kotlin/org/siloserver/silo/common/player/PlaybackSessionManager.kt).
