@@ -155,3 +155,11 @@ Open the add-on after profile selection. Home must be the initial page, with vis
 Choose **View all**, open a title, then return through the section to Home. Verify focus returns to **View all**. In a section with more than 50 cards, use **Load more** and verify the server cursor supplies additional cards without resetting selection. Switch to a library and back to Home through the sidebar. Verify an empty Home leaves library navigation accessible.
 
 After playback, verify Continue Watching reflects the server's updated progress. Switch profiles and verify the previous profile's rows are not retained. Exercise unavailable layout support separately from authentication and network failures: only unsupported endpoints permit compatibility fallback. Keep screenshots brief and verify idle display protection after closing the browser.
+
+## Account navigation and PIN acceptance
+
+Launch Silo from Kodi's video add-ons or through JSON-RPC `Addons.ExecuteAddon` with `addonid: plugin.video.silo`. The browser runs as a script; the root plugin route delegates to it after returning to Kodi Home. Closing Silo must return to Kodi instead of launching another browsing window. Playback remains on the `action=play` plugin route.
+
+Open **Account**, choose profiles, and select a PIN-protected test profile. Incorrect input must leave the original profile active. Correct input must open that profile's Home after closing Account, without retaining the original profile's Continue Watching rows. Switch back and verify the original rows return. Use Kodi's masked text entry: its numeric input ignores the hidden-input option, and Silo accepts nonnumeric PINs. Canceling the dialog must not submit a PIN attempt.
+
+The device check passes incorrect/correct PIN entry and switching in both directions with an empty-history temporary profile. The temporary profile is removed and the original selection restored after acceptance. This does not qualify every content restriction or profile-token expiry scenario.

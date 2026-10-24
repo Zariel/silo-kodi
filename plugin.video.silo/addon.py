@@ -6,6 +6,7 @@ from urllib.parse import parse_qs
 sys.path.insert(0, str(Path(__file__).resolve().parent / 'resources/lib'))
 
 import xbmcaddon
+import xbmc
 import xbmcgui
 import xbmcplugin
 import xbmcvfs
@@ -43,6 +44,13 @@ def main():
         return
     if handle >= 0:
         xbmcplugin.endOfDirectory(handle, cacheToDisc=False)
+        # RunAddon prefers the plugin extension even for a script/video add-on.
+        # Leave its directory before launching the independent UI script.
+        xbmc.executebuiltin('ActivateWindow(Home)', True)
+        xbmc.executebuiltin('RunScript(plugin.video.silo)')
+        return
+    # A window-owning script must not remain inside a directory request:
+    # returning to that directory can invoke another browsing session.
     from silo.browser import open_browser
     open_browser()
 
