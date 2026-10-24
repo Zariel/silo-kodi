@@ -178,10 +178,13 @@ The [quality playback design](quality-playback.md) records the native HLS target
 
 ### 6. Silo Home as the main page
 
+Implementation status: profile-bound layout, section-card, and paginated section reads are implemented. The deployed server returns its layout and cards through these methods; an expanded section returns an opaque next-page cursor. The Home screen and default-order fallback remain unfinished. No optional layout parameters are sent, so the basic read does not require capability negotiation.
+
 - Open Home after sign-in and profile selection. Keep libraries and profile switching accessible from the main navigation. Follow the Silo TV references and server-configured accent, reusing existing cards, details, and playback actions.
 - Fetch the acting profile's section layout from `GET /api/v2/home/layout` and load cards through `/api/v2/home/sections/{id}/items`. Preserve server ordering and visibility, including supported custom sections. Use `/api/v2/home/capabilities` to negotiate optional features such as including the first rows' cards with the layout.
 - If the layout endpoint is unsupported, use `/api/v2/home/sections` where available. If the server cannot provide ordering, use Silo's default section order, documented against the upstream implementation at implementation time. Fetch content from supported server APIs; do not create a local catalog, recommendation engine, or watch-state store. Authentication failures and temporary network errors must remain explicit errors, not trigger a compatibility fallback.
 - Load rows on demand, handle empty and unsupported sections, and preserve remote focus when returning from details or playback. Refresh server-owned progress after playback and discard the previous profile's Home state on profile changes. Home editing and section reordering are outside this milestone.
+- Use `/home/sections/{id}/items` for a bounded row and `/catalog?source=section&scope=home&section_id=…` for expanded section browsing with opaque cursors. Omit `sort` to preserve the recipe's order and omit `type=video`, which would exclude episode cards. Filter unsupported media types locally without discarding the server cursor.
 - **Acceptance:** Home is the entry screen; supported rows follow the profile's server layout; selecting a card reaches the correct details and playback flow. Verify remote navigation, row pagination where supported, return focus, updated Continue Watching, empty/error states, profile isolation, and the default-order compatibility fallback.
 
 ### Cross-cutting work and future work

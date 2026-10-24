@@ -35,6 +35,32 @@ class Catalog:
         return [item for item in self._get('/user/libraries')['items']
                 if item.get('type') in ('movies', 'series')]
 
+    def home(self):
+        try:
+            result = self._get('/home/layout')
+        except Error as exc:
+            if exc.status not in (404, 405, 501):
+                raise
+            result = self._get('/home/sections')
+        # Both endpoints return the profile's visible sections in display order.
+        # An empty layout is authoritative; do not replace it with default rows.
+        return result['sections']
+
+    def home_section(self, section_id):
+        result = self._get('/home/sections/' + quote(str(section_id), safe='') + '/items')
+        return dict(result, items=[item for item in result['items']
+                                   if item.get('type') in ('movie', 'series', 'episode')])
+
+    def home_page(self, section_id, cursor=None):
+        query = {'source': 'section', 'scope': 'home', 'section_id': section_id, 'limit': 50}
+        if cursor is not None:
+            query['cursor'] = cursor
+        # Omit sort and type: preserve recipe ordering and episode cards.
+        result = self._get('/catalog', query)
+        return {'items': [item for item in result['items']
+                          if item.get('type') in ('movie', 'series', 'episode')],
+                'next_cursor': result.get('page', {}).get('next_cursor')}
+
     def page(self, library_id, cursor=None):
         query = {'source': 'query', 'library_id': library_id, 'type': 'video',
                  'sort': 'title', 'limit': 50}
