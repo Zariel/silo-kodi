@@ -1,10 +1,11 @@
 """Attempt-scoped HTTP transport with fresh authority on every upstream read."""
+import hashlib
 import http.client
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import secrets
 import socket
 import threading
-from urllib.parse import urlsplit
+from urllib.parse import urljoin, urlsplit
 
 from .client import Error
 from .playback import media_url
@@ -77,7 +78,7 @@ class _Handler(BaseHTTPRequestHandler):
         # Kodi may stop reading while paused. Explicit socket shutdown, rather
         # than a write timeout, cancels that backpressure when playback ends.
         self.connection.settimeout(None)
-        parts, plan_headers = resource
+        parts, plan_headers, playlist, _ = resource
         conn = None
         upstream_socket = None
         sent = False
@@ -94,7 +95,7 @@ class _Handler(BaseHTTPRequestHandler):
             headers.update(authority)
             headers['Accept-Encoding'] = 'identity'
             for name in ('Range', 'If-Range'):
-                if name in self.headers:
+                if not playlist and name in self.headers:
                     headers[name] = self.headers[name]
             conn = http.client.HTTPSConnection(parts.hostname, parts.port, timeout=10)
             conn.connect()
@@ -102,7 +103,8 @@ class _Handler(BaseHTTPRequestHandler):
             # of it for a Connection: close response. Shutdown interrupts reads.
             upstream_socket = conn.sock
             relay._register(upstream_socket)
-            conn.request(self.command, parts.path + ('?' + parts.query if parts.query else ''), headers=headers)
+            conn.request('GET' if playlist else self.command,
+                         parts.path + ('?' + parts.query if parts.query else ''), headers=headers)
             with conn.getresponse() as response:
                 if response.status not in (200, 206):
                     status = response.status if response.status in (401, 403, 404, 410, 416, 429, 503) else 502
@@ -110,6 +112,22 @@ class _Handler(BaseHTTPRequestHandler):
                     return
                 if response.getheader('Content-Encoding', 'identity') != 'identity':
                     self._empty(502)
+                    return
+                if playlist:
+                    if response.status != 200:
+                        raise Error('unsupported_playback')
+                    data = response.read(1024 * 1024 + 1)
+                    if response.length not in (None, 0):
+                        raise Error('unsupported_playback')
+                    body = relay._playlist(self.path, resource, data)
+                    self.send_response(200)
+                    self.send_header('Content-Type', 'application/vnd.apple.mpegurl')
+                    self.send_header('Content-Length', str(len(body)))
+                    self.send_header('Cache-Control', 'no-store')
+                    self.end_headers()
+                    sent = True
+                    if self.command == 'GET':
+                        self.wfile.write(body)
                     return
                 self.send_response(response.status)
                 for name in ('Content-Type', 'Content-Length', 'Content-Range', 'Accept-Ranges', 'ETag', 'Last-Modified'):
@@ -159,17 +177,72 @@ class MediaRelay:
 
     def update(self, resources):
         updated = {}
+        generation = secrets.token_hex(12)
         for name, stream in resources.items():
             parts = urlsplit(media_url(self._session.server, stream).split('|', 1)[0])
             if not name or parts.fragment or any(c in name for c in '/?#'):
                 raise Error('unsupported_playback')
-            updated[self._prefix + name] = (parts, dict(stream.get('headers') or {}))
+            updated[self._prefix + name] = (parts, dict(stream.get('headers') or {}),
+                                            stream.get('protocol') == 'hls', generation)
         # Publish a fully validated plan in one assignment. Transfers already
         # reading keep their resource; later requests use the replacement grant.
         with self._lock:
             if self._closed:
                 raise Error('unsupported_playback')
             self._resources = updated
+            self._generation = generation
+            self._playlist_children = {}
+
+    def _playlist(self, path, resource, body):
+        if len(body) > 1024 * 1024:
+            raise Error('unsupported_playback')
+        try:
+            lines = body.decode('utf-8').splitlines()
+        except UnicodeDecodeError:
+            raise Error('unsupported_playback') from None
+        # This contract covers the server's complete, unencrypted media VOD
+        # playlist. Unknown HLS tags may carry URLs, so fail closed.
+        tags = {'#EXTM3U', '#EXT-X-VERSION', '#EXT-X-TARGETDURATION', '#EXT-X-MEDIA-SEQUENCE',
+                '#EXT-X-PLAYLIST-TYPE', '#EXTINF', '#EXT-X-ENDLIST', '#EXT-X-BYTERANGE',
+                '#EXT-X-DISCONTINUITY', '#EXT-X-PROGRAM-DATE-TIME', '#EXT-X-INDEPENDENT-SEGMENTS'}
+        if not lines or lines[0] != '#EXTM3U' or '#EXT-X-ENDLIST' not in lines:
+            raise Error('unsupported_playback')
+        parts, headers, _, generation = resource
+        rewritten = []
+        children = {}
+        references = 0
+        for line in lines:
+            line = line.strip()
+            if line.startswith('#EXT') and line.split(':', 1)[0] not in tags:
+                raise Error('unsupported_playback')
+            if line and not line.startswith('#'):
+                references += 1
+                if references > 10000:
+                    raise Error('unsupported_playback')
+                url = media_url(self._session.server, {'url': urljoin(parts.geturl(), line)})
+                child = urlsplit(url)
+                if child.fragment or not child.path.endswith('.ts'):
+                    raise Error('unsupported_playback')
+                key = hashlib.sha256((path + '\n' + url).encode()).hexdigest()
+                line = self._prefix + 'segments/' + generation + '/' + key
+                children[line] = (child, headers, False, generation)
+            rewritten.append(line)
+        if not children:
+            raise Error('unsupported_playback')
+        with self._lock:
+            if self._closed or generation != self._generation:
+                raise Error('unsupported_playback')
+            # A late playlist must never restore grants retired by a replan.
+            # Repeated playlist reads replace their own references, bounding growth.
+            previous = self._playlist_children.get(path, set())
+            total = sum(len(paths) for paths in self._playlist_children.values()) - len(previous) + len(children)
+            if total > 10000:
+                raise Error('unsupported_playback')
+            updated = {key: value for key, value in self._resources.items() if key not in previous}
+            updated.update(children)
+            self._resources = updated
+            self._playlist_children[path] = set(children)
+        return ('\n'.join(rewritten) + '\n').encode()
 
     def url(self, name):
         path = self._prefix + name

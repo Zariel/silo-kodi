@@ -1,6 +1,6 @@
 # Select playback quality without losing position
 
-Status: the target plays a server-negotiated SDR H.264/AAC transcode through Kodi's native HLS player and seeks on its full timeline. Quality controls and authenticated HLS relay integration are not implemented. Production capabilities still advertise original HTTP only.
+Status: the target plays a server-negotiated SDR H.264/AAC transcode through Kodi's native HLS player and the authenticated relay, including seeking after credential rotation. Quality controls and player transition integration are not implemented. Production capabilities still advertise original HTTP only.
 
 ## Requirement and ownership
 
@@ -32,6 +32,8 @@ Extend the attempt relay for the server's observed HLS shape, retaining native K
 
 The observed media playlist is a finite VOD playlist with relative segment references. Fetch it with current profile authority, enforce a size limit, and resolve references against the validated upstream playlist URL. Replace references with opaque loopback resources. Validate every resolved origin before exposing it. Retain upstream queries and required headers without exposing bearer credentials to Kodi.
 
+The implemented relay accepts complete UTF-8 media playlists with MPEG-TS segment references, up to 1 MiB and 10,000 references. It rejects unknown HLS tags, nested playlists, encryption keys, initialization maps, cross-origin references, and truncated bodies. GET and HEAD describe the rewritten representation. Resource replacement retires the old generation, and a delayed playlist response cannot publish references into the new generation. These bounds cover the observed server transcode shape; other shapes need explicit implementation and qualification.
+
 Playlist rewriting must update content length and avoid forwarding validators for the unmodified representation. A HEAD response must describe the representation actually served. Bound resource growth and reject unsupported reference-bearing tags instead of letting Kodi bypass the relay. If an HLS variant, initialization segment, encryption key, or subtitle rendition is encountered, explicitly support its reference contract or reject that plan; do not silently ignore it.
 
 Keep resource publication scoped to the current plan generation. A late response from an old playlist must not reinstall retired segment grants after a quality change. Existing transfers retain their opened resource and remain cancellable by session cleanup. The relay does not parse media segments or choose quality.
@@ -50,6 +52,10 @@ A target API probe advertised experimental HLS support without changing installe
 
 This establishes native-engine feasibility only. It does not establish the integrated quality menu, credential renewal across segments, pause restoration, continuous quality switching, natural expiry, or high-bitrate output.
 
+A subsequent target probe used the relay for the playlist and segments, paused, rotated the real access credential, sought to nine minutes, and observed advancing playback and media requests with fresh authority. Controlled-origin tests independently reject stale authority and verify query preservation, rewritten HEAD length, retired references, and late responses after a replan. Integrated quality transitions and natural expiry remain unqualified.
+
+The probe also exposed a cleanup constraint: calling Python `Player.stop()` caused three loopback metadata-request timeouts after video shutdown. Kodi's Python stop method waits synchronously without the delayed-call guard used by its internal JSON-RPC wrapper. A probe using internal JSON-RPC `Player.Stop` avoided the delay. That operation queues a stop, so integration must wait for the owned player to end before retiring the relay; an acknowledgement alone is not completion.
+
 Acceptance must cover:
 
 1. Playlist/segment origin validation, query preservation, bounded parsing, unsupported references, stale generations, truncation, cancellation, and current authority through the loopback interface.
@@ -64,3 +70,4 @@ Acceptance must cover:
 - [Android server-owned quality menu](https://github.com/Silo-Server/silo-android/blob/0545b85deb3be6c32868200a7b2b3edbd3ab02ef/shared/src/commonMain/kotlin/org/siloserver/silo/model/playback/PlaybackQualityMenu.kt).
 - [Android replan and server-plan ownership](https://github.com/Silo-Server/silo-android/blob/0545b85deb3be6c32868200a7b2b3edbd3ab02ef/android-shared/src/androidMain/kotlin/org/siloserver/silo/common/player/PlaybackSessionManager.kt).
 - [Apple server-provided playback choices](https://github.com/Silo-Server/silo-apple/blob/e9ea909d0c04f3a17b5333210677345715521577/iosApp/iosApp/Screens/Player/ApplePlaybackQuality.swift).
+- [Kodi Python player calls](https://github.com/xbmc/xbmc/blob/Omega/xbmc/interfaces/legacy/Player.cpp), [internal JSON-RPC wrapper](https://github.com/xbmc/xbmc/blob/Omega/xbmc/interfaces/legacy/ModuleXbmc.cpp), and [queued player stop](https://github.com/xbmc/xbmc/blob/Omega/xbmc/interfaces/json-rpc/PlayerOperations.cpp).
