@@ -29,3 +29,5 @@ python scripts/dev.py package
 ```
 
 The ZIP is written to `dist/`. Follow the test guide for SSH setup and deployment. Local testing references and configuration belong in ignored `.local-testing/`. Internal notes, source snapshots, and raw output belong in ignored `.scratch/`; generated ZIPs belong in ignored `dist/`.
+
+The [API usage audit](docs/api-audit.md) covers the complete v2 endpoint inventory, current actions, and deferred capabilities.

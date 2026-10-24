@@ -1,6 +1,6 @@
 # Minimal Silo Kodi client
 
-Status: authentication, browsing, original-stream playback, quality selection with SDR HLS transitions, and text/embedded PGS subtitle controls are implemented and undergoing device acceptance. Representative combined quality/subtitle and audio-preservation workflows pass. Broader playback qualification, additional subtitle formats, and the Home milestone remain unfinished. This document describes the complete intended client, grounded in the Silo v2 contract.
+Status: authentication, browsing, original-stream playback, quality selection with SDR HLS transitions, and text/embedded PGS subtitle controls are implemented and undergoing device acceptance. Representative combined quality/subtitle and audio-preservation workflows pass. Broader playback qualification, additional subtitle formats, and broader Home error handling remain unfinished. This document describes the complete intended client, grounded in the Silo v2 contract.
 
 ## Requirement and boundaries
 
@@ -20,7 +20,7 @@ Exclude catalog synchronization, a local metadata database, whole-Kodi skins, do
 | Small Python add-on using Silo native v2 | Direct device sign-in, explicit account profiles, viewer-scoped catalog, and negotiated source playback | Selected |
 | Kodi library sync or direct filesystem access | Duplicates catalog ownership or bypasses Silo playback authority | Does not satisfy this requirement |
 
-Use `/api/v2`, not the retiring v1 bridge. Resolve capabilities from the server instead of matching version strings. The live contract is available at `/api/v2/openapi.json`; record its digest when investigating incompatibility. Keep a handwritten client for the few operations below, rather than generating the whole server API.
+Use `/api/v2`, not the retiring v1 bridge. Resolve capabilities from the server instead of matching version strings. The live contract is available at `/api/v2/openapi.json`; record its digest when investigating incompatibility. Keep a handwritten client for the few operations below, rather than generating the whole server API. The [full API audit](api-audit.md) maps all API groups to scope and records action-level contracts and follow-up opportunities.
 
 Use Python 3.11 and standard-library HTTP/JSON. Kodi's Python APIs are supplied by the target. Use one entry module with a script extension for browsing windows and a plugin extension for playback resolution and status reads. Kodi’s RunAddon action prefers the plugin extension, so its root launcher completes the directory request, returns to Kodi Home, and launches the independent UI script. A browsing window must not remain inside directory resolution: returning to an uncached plugin directory can start another browser and obscure the account screen. Keep authentication, catalog reads, and playback in small internal modules. Avoid a general routing framework.
 
@@ -72,13 +72,13 @@ All paths below are relative to `/api/v2` and use the selected profile's authori
 
 | Screen or action | Endpoint | Behavior |
 | --- | --- | --- |
-| Libraries | `GET /user/libraries` | Viewer libraries; do not use admin `/libraries` |
-| Library | `GET /catalog?source=query&library_id=…&limit=50` | Render returned items and a next-page entry from `page.next_cursor` |
+| Libraries | `GET /user/libraries` and `/settings/values/effective?keys=ui.disabled_library_ids` | Filter self-hidden viewer libraries; do not use admin `/libraries` |
+| Library | `GET /catalog?source=query&library_id=…&limit=50` | Use `skip_total=true`; render items and a next-page entry from `page.next_cursor` |
 | Movie or series details | `GET /catalog/items/{id}` | Use returned metadata and artwork URLs |
 | Seasons | `GET /catalog/series/{id}/seasons` | One folder per returned season |
 | Episodes | `GET /catalog/series/{id}/seasons/{num}/episodes` | Playable episodes, respecting unavailable files |
-| Versions | `GET /catalog/items/{id}/versions` | Select a playable file; keep item ID and file ID distinct |
-| Watch state | `GET /watch/{id}` | Obtain resume and playback detail before starting |
+| Versions and resume menu | `GET /watch/{id}` | Use its playable versions and profile progress together; keep item ID and file ID distinct |
+| Playback track metadata | `GET /catalog/items/{id}/versions` | The independent playback owner reads trusted track inventory under its originating profile |
 
 List responses, null values, and file relationships must be checked against real authenticated fixtures before implementing the mapper. Unknown media kinds must not be presented as playable videos. Use `VideoInfoTag` and Kodi list items rather than importing metadata into Kodi's database. Server authorization remains authoritative for every detail and playback request, even if a directory entry was cached by Kodi's UI.
 
