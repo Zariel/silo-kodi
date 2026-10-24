@@ -165,6 +165,8 @@ Keep live integration checks separate from deterministic tests using synthetic r
 
 ### 5. Playback quality and subtitles
 
+The [quality playback design](quality-playback.md) records the native HLS target probe, server and mobile-client contracts, transport alternatives, and remaining transition checks.
+
 - Discover server-provided quality choices and offer a small quality selector. Keep source-version selection distinct from quality adaptation.
 - Implement supported delivery/replan paths needed for those choices, preserving position and session semantics. Do not assume progressive remux offers arbitrary seeking or that quality adaptation preserves Dolby Vision/FEL.
 - Add explicit subtitle choices, Off, language/forced/default behavior, and external subtitle delivery where supported. Embedded tracks Kodi already exposes may work earlier; this milestone owns the complete selection behavior. Validate text and bitmap subtitles and any server-required burn-in path before claiming them.
