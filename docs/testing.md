@@ -1,12 +1,12 @@
 # Test on CoreELEC
 
-Use the development loop below to validate code through the actual Kodi interpreter and player. The client provides library and detail screens, account authentication, and initial original SDR playback. The legacy player smoke test uses a temporary local silent WAV; it does not qualify Silo playback.
+Use the development loop below to validate code through the actual Kodi interpreter and player. The client provides library and detail screens, account authentication, and initial original SDR playback. The playback smoke test uses a chosen Silo video through the installed add-on.
 
 ## Prerequisites
 
 - A CoreELEC device reachable over SSH and Kodi JSON-RPC on a trusted LAN.
 - Python 3.11, SSH, and the standard library. Run `nix develop path:.` for the pinned toolchain. No Python package installation is needed.
-- For video/output qualification, power on the display and AVR and select the player's input. They are not required for directory execution or the silent local smoke test.
+- For playback checks, power on the display and AVR and select the player's input. They are not required for the nonvisual server probe.
 
 Keep real addresses, SSH options, hardware inventories, cluster paths, and validation results in ignored `.local-testing/`. Create a local `env.sh` there with your own values for these variables:
 
@@ -38,7 +38,9 @@ python scripts/dev.py smoke
 
 `deploy` refuses to run while Kodi is playing. It copies and verifies the ZIP by SHA-256, extracts a fresh add-on tree, and saves the previous tree at `/storage/.kodi/temp/silo-kodi-previous`. It asks Kodi to rescan and enable the add-on through supported interfaces, waits for the expected version, then executes its status route through `Files.GetDirectory`. No Kodi restart or SQLite edits are needed. The backup holds only the previous deployment and is replaced on the next deploy. Deployment preserves user data under `userdata/addon_data`. When `--server` or `SILO_SERVER_URL` is set, it configures that server through the shared helper; using the same URL preserves login, while changing it clears origin-bound credentials.
 
-`smoke` also refuses to interrupt existing playback. It creates a 120-second silent stereo WAV in Kodi's temporary directory, opens the hidden development route `plugin://plugin.video.silo/?action=smoke`, and observes the resolved file, player readiness, a stable paused clock, a seek to 45 seconds, resumed clock advancement, and stop. It removes the fixture in cleanup. It stops only the fixture if another client takes over during cleanup. The development route is not listed in the add-on UI and must be removed when real playback replaces the scaffold.
+Before running `smoke`, sign in and choose a profile in the add-on. Set `SILO_TEST_FILE_ID` in ignored local configuration to the `file_id` of a known supported video at least 60 seconds long, or pass `--file-id FILE_ID`. This test starts the video from the beginning and changes its Silo watch progress.
+
+`smoke` refuses to interrupt existing playback. It opens the normal playback route, checks player readiness, pauses and verifies a stable clock, seeks to 45 seconds, resumes and verifies clock advancement, then stops its own playback. It matches a unique invocation identity instead of assuming a fixed player ID. Cleanup preserves another client's replacement item and returns an idle device to its configured screensaver. A separate target process verifies release of playback authority. This short check does not qualify HDR, audio passthrough, sustained bitrate, or watch-state resume.
 
 Kodi RPC commands acknowledge requests before all player state is updated. The harness waits for resulting state with a deadline rather than assuming a command response means a completed transition.
 

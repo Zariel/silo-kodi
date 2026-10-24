@@ -28,13 +28,6 @@ def main():
         else:
             xbmcplugin.setResolvedUrl(handle, False, xbmcgui.ListItem())
         return
-    if action == 'smoke':
-        path = 'special://temp/silo-kodi-smoke.wav'
-        item = xbmcgui.ListItem(path=path)
-        item.setMimeType('audio/wav')
-        item.setContentLookup(False)
-        xbmcplugin.setResolvedUrl(handle, xbmcvfs.exists(path), item)
-        return
     if action == 'status':
         directory = xbmcvfs.translatePath(xbmcaddon.Addon().getAddonInfo('profile'))
         session = Session.open(directory)

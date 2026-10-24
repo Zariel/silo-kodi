@@ -12,6 +12,8 @@ import subprocess
 import sys
 import time
 from urllib.request import Request, urlopen
+from urllib.parse import urlencode
+import uuid
 import xml.etree.ElementTree as ET
 import zipfile
 
@@ -198,56 +200,83 @@ def wait_for(observe, ready, timeout=20):
 
 def smoke(args):
     idle(args)
-    browse(args)
-    remote_python(args, '''
-import wave
-with wave.open("/storage/.kodi/temp/silo-kodi-smoke.wav", "wb") as audio:
-    audio.setnchannels(2)
-    audio.setsampwidth(2)
-    audio.setframerate(48000)
-    for _ in range(120):
-        audio.writeframes(b"\\0" * (48000 * 4))
-''')
-    player = None
+    profile = json.loads(remote_python(args, """
+import json, sys
+sys.path.insert(0, '/storage/.kodi/addons/plugin.video.silo/resources/lib')
+from silo.client import Session
+session = Session.open('/storage/.kodi/userdata/addon_data/plugin.video.silo')
+print(json.dumps(session.status().get('profile') if session else None))
+"""))
+    if not profile:
+        raise RuntimeError("Sign in and choose a Silo profile before running playback acceptance")
+    label = 'Silo playback check ' + uuid.uuid4().hex
+    route = 'plugin://plugin.video.silo/?' + urlencode({
+        'action': 'play', 'profile': profile['id'], 'file': args.file_id,
+        'title': label, 'restart': 'true'})
+
+    def owned_player():
+        for active in rpc(args, "Player.GetActivePlayers"):
+            item = rpc(args, "Player.GetItem", {
+                "playerid": active["playerid"], "properties": ["file"],
+            })["item"]
+            if item.get("file") == route or item.get("label") == label:
+                return active["playerid"]
+        return None
+
+    def state():
+        player = owned_player()
+        if player is None:
+            return None
+        return rpc(args, "Player.GetProperties", {
+            "playerid": player, "properties": ["time", "totaltime", "speed", "canseek"]})
+
+    def control(method, params):
+        player = owned_player()
+        if player is None:
+            raise RuntimeError("The test playback was replaced or stopped")
+        return rpc(args, method, dict(params, playerid=player))
+
     try:
-        rpc(args, "Player.Open", {"item": {"file": "plugin://plugin.video.silo/?action=smoke"}})
-        players = wait_for(lambda: rpc(args, "Player.GetActivePlayers"), bool)
-        player = players[0]["playerid"]
-        item = rpc(args, "Player.GetItem", {"playerid": player, "properties": ["file"]})["item"]
-        assert item["file"].endswith("silo-kodi-smoke.wav"), item
-        params = {"playerid": player, "properties": ["time", "speed", "canseek"]}
-        state = lambda: rpc(args, "Player.GetProperties", params)
-        # A player can exist before its demuxer is ready. Every transition below
-        # is verified through subsequent observations, not the command response.
-        wait_for(state, lambda value: value["canseek"] and seconds(value["time"]) > 0)
-        rpc(args, "Player.PlayPause", {"playerid": player, "play": False})
+        rpc(args, "Player.Open", {"item": {"file": route}})
+        ready = wait_for(state, lambda value: value and value["canseek"]
+                         and seconds(value["time"]) > 0, timeout=60)
+        if seconds(ready['totaltime']) < 60:
+            raise RuntimeError("Choose a test video at least 60 seconds long")
+        control("Player.PlayPause", {"play": False})
 
         def pause_sample():
             before = state()
             time.sleep(1)
             return before, state()
 
-        wait_for(pause_sample, lambda pair: all(v["speed"] == 0 for v in pair)
+        wait_for(pause_sample, lambda pair: all(v and v["speed"] == 0 for v in pair)
                  and abs(seconds(pair[0]["time"]) - seconds(pair[1]["time"])) < 0.1)
-        rpc(args, "Player.Seek", {"playerid": player, "value": {"time": {"seconds": 45}}})
-        wait_for(state, lambda value: abs(seconds(value["time"]) - 45) < 1)
-        rpc(args, "Player.PlayPause", {"playerid": player, "play": True})
-        wait_for(state, lambda value: value["speed"] == 1 and seconds(value["time"]) > 46)
-        print("Kodi resolved fixture, paused, sought to 45s, and resumed: OK")
+        control("Player.Seek", {"value": {"time": {"seconds": 45}}})
+        wait_for(state, lambda value: value and abs(seconds(value["time"]) - 45) < 2, timeout=45)
+        control("Player.PlayPause", {"play": True})
+        wait_for(state, lambda value: value and value["speed"] == 1 and seconds(value["time"]) > 47)
+        print("Silo video played, paused, sought to 45s, and resumed: OK")
     finally:
-        # Stop only our fixture, even when another client replaced it mid-test.
-        for active in rpc(args, "Player.GetActivePlayers"):
-            item = rpc(args, "Player.GetItem", {
-                "playerid": active["playerid"], "properties": ["file"],
-            })["item"]
-            if item["file"].endswith("silo-kodi-smoke.wav"):
-                rpc(args, "Player.Stop", {"playerid": active["playerid"]})
-        remote_python(args, '''
-from pathlib import Path
-Path("/storage/.kodi/temp/silo-kodi-smoke.wav").unlink(missing_ok=True)
-''')
-    wait_for(lambda: rpc(args, "Player.GetActivePlayers"), lambda players: not players)
-    print("Player stop and fixture cleanup: OK")
+        # Player IDs can change with playlist context. Match this invocation's
+        # identity before stopping, never merely the player ID observed at start.
+        player = owned_player()
+        if player is not None:
+            rpc(args, "Player.Stop", {"playerid": player})
+        wait_for(owned_player, lambda player: player is None)
+        if not rpc(args, "Player.GetActivePlayers"):
+            ssh(args, 'kodi-send --action=ActivateScreensaver')
+    probe = """
+import sys
+sys.path.insert(0, '/storage/.kodi/addons/plugin.video.silo/resources/lib')
+from silo.client import Session, Error
+session = Session.open('/storage/.kodi/userdata/addon_data/plugin.video.silo')
+try:
+    with session.store.playback_lock(): print('released')
+except Error as exc:
+    print(exc.code)
+"""
+    wait_for(lambda: remote_python(args, probe).strip(), lambda value: value == 'released', timeout=30)
+    print("Player stopped and playback authority released: OK")
 
 
 def main():
@@ -257,17 +286,20 @@ def main():
     parser.add_argument("--rpc", default=os.environ.get("SILO_RPC_URL"))
     parser.add_argument("--server", default=os.environ.get("SILO_SERVER_URL"))
     parser.add_argument("--release-tag", help="Require the package version to match this v-prefixed release tag")
+    parser.add_argument("--file-id", default=os.environ.get("SILO_TEST_FILE_ID"), help="Silo video file for playback acceptance")
     args = parser.parse_args()
     required = []
     if args.command not in ("check", "package"):
         required.append("rpc")
     if args.command in ("deploy", "probe", "smoke"):
         required.append("ssh")
+    if args.command == "smoke":
+        required.append("file_id")
     if args.command == "probe":
         required.append("server")
     for name in required:
         if not getattr(args, name):
-            parser.error("--{} or its SILO_* environment variable is required".format(name))
+            parser.error("--{} or its SILO_* environment variable is required".format(name.replace("_", "-")))
     if args.command == "check":
         check()
         subprocess.run([sys.executable, "-m", "unittest", "discover", "-s", "tests", "-v"], cwd=ROOT, check=True)

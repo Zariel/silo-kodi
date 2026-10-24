@@ -30,7 +30,8 @@ This is a validation matrix, not a release support guarantee. Deployment-specifi
 | Progress and resume | Silo records position; UI resume reaches it; startup samples wait for the observed position |
 | Pause and resume | A 60-second pause keeps a stable clock and playback resumes |
 | Seeking | Forward/backward seeks converge; variable recovery latency and audible A/V sync still need qualification |
-| Stop cleanup | The episode played through the UI loses media access after stop and releases playback authority; replacement/failure checks remain |
+| Stop cleanup | The episode played through the UI loses media access after stop and releases playback authority |
+| External replacement | A second authorized video is identified independently, continues advancing after the old owner releases authority, and loses access after its test session is stopped |
 | Failed start | A missing-file request leaves Kodi idle and a subsequent valid video plays without a Kodi restart; post-resolution failures have focused cleanup regression tests |
 | Episode playback | Representative H.264 SDR episode with E-AC-3 advances for over 70 seconds |
 | Audio selection | Kodi controls retained; track changes and language/default mapping remain to be validated |
@@ -38,5 +39,5 @@ This is a validation matrix, not a release support guarantee. Deployment-specifi
 | DTS-HD MA, TrueHD, Atmos | No end-to-end output qualification; decoder/stream labels do not prove AVR output |
 | Sustained bitrate | Short range reads measured; long playback across bitrate peaks remains |
 | Media credential rotation | API refresh works; native media reopening with fresh credentials remains |
-| Text subtitles | Authenticated WebVTT sidecar loads and displays captions after a seek; repeat playback exposed inconsistent selected-track behavior that needs explicit selection verification; SRT is not yet device-qualified |
+| Text subtitles | Authenticated WebVTT sidecar displays captions; repeated starts select it and retain selection after seeking. Loading and selection are asynchronous, so track count alone is insufficient evidence. SRT is not yet device-qualified |
 | Quality and subtitle controls | Selection UI, quality replans, native embedded identity mapping, ASS/fonts, and bitmap paths remain |
