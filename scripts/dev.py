@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import shlex
 import subprocess
+import sys
 import time
 from urllib.request import Request, urlopen
 import xml.etree.ElementTree as ET
@@ -24,10 +25,20 @@ def check():
     assert manifest.attrib["id"] == ADDON_ID
     entry = manifest.find("extension[@point='xbmc.python.pluginsource']")
     assert entry is not None and (ADDON / entry.attrib["library"]).is_file()
-    ET.parse(ADDON / "resources/settings.xml")
+    for path in ADDON.rglob("*.xml"):
+        ET.parse(path)
     for path in [*ADDON.rglob("*.py"), *(ROOT / "scripts").glob("*.py")]:
         ast.parse(path.read_text(), filename=str(path), feature_version=(3, 11))
     print("Manifest, entry point, and Python 3.11 syntax: OK")
+
+
+def package_files():
+    files = [ADDON / name for name in ("addon.xml", "addon.py", "auth.py", "LICENSE.txt", "THIRD_PARTY.md")]
+    for directory, extensions in (("resources/lib", {".py"}), ("resources/skins", {".xml", ".png"})):
+        files.extend(path for path in (ADDON / directory).rglob("*")
+                     if path.is_file() and path.suffix in extensions and "__pycache__" not in path.parts)
+    files.append(ADDON / "resources/lib/segno/LICENSE")
+    return sorted(files)
 
 
 def package():
@@ -37,10 +48,11 @@ def package():
     output.parent.mkdir(exist_ok=True)
     # An explicit allowlist keeps scratch files and credentials out of releases.
     with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as archive:
-        for name in ("addon.xml", "addon.py", "LICENSE.txt", "resources/settings.xml"):
+        for path in package_files():
+            name = path.relative_to(ADDON).as_posix()
             info = zipfile.ZipInfo(ADDON_ID + "/" + name, (2026, 1, 1, 0, 0, 0))
             info.external_attr = 0o644 << 16
-            archive.writestr(info, (ADDON / name).read_bytes(), zipfile.ZIP_DEFLATED)
+            archive.writestr(info, path.read_bytes(), zipfile.ZIP_DEFLATED)
     print(output.relative_to(ROOT))
     return output
 
@@ -97,10 +109,7 @@ target = addons / "plugin.video.silo"
 backup = Path("/storage/.kodi/temp/silo-kodi-previous")
 with tempfile.TemporaryDirectory(prefix="silo-kodi-", dir=addons) as stage:
     with zipfile.ZipFile(archive) as bundle:
-        assert set(bundle.namelist()) == {
-            "plugin.video.silo/addon.xml", "plugin.video.silo/addon.py",
-            "plugin.video.silo/LICENSE.txt", "plugin.video.silo/resources/settings.xml",
-        }
+        assert set(bundle.namelist()) == set(%r)
         bundle.extractall(stage)
     if target.exists():
         if backup.exists():
@@ -114,33 +123,32 @@ with tempfile.TemporaryDirectory(prefix="silo-kodi-", dir=addons) as stage:
         raise
 archive.unlink()
 print("Installed archive verified by SHA-256; previous build kept in Kodi temp")
-''' % digest).strip())
+''' % (digest, [ADDON_ID + '/' + path.relative_to(ADDON).as_posix() for path in package_files()])).strip())
     ssh(args, "kodi-send --action=UpdateLocalAddons")
-    deadline = time.monotonic() + 20
-    while True:
+    expected = ET.parse(ADDON / "addon.xml").getroot().attrib["version"]
+    def addon_details():
         try:
-            details = rpc(args, "Addons.GetAddonDetails", {
+            return rpc(args, "Addons.GetAddonDetails", {
                 "addonid": ADDON_ID, "properties": ["enabled", "version"],
             })["addon"]
-            break
         except RuntimeError:
-            if time.monotonic() >= deadline:
-                raise
-            time.sleep(0.5)
+            return None
+    details = wait_for(addon_details, lambda value: value and value["version"] == expected)
     if not details["enabled"]:
         rpc(args, "Addons.SetAddonEnabled", {"addonid": ADDON_ID, "enabled": True})
-    details = rpc(args, "Addons.GetAddonDetails", {
-        "addonid": ADDON_ID, "properties": ["enabled", "version"],
-    })["addon"]
-    assert details["enabled"]
-    assert details["version"] == ET.parse(ADDON / "addon.xml").getroot().attrib["version"]
+    details = wait_for(addon_details, lambda value: value and value["enabled"] and value["version"] == expected)
     print(json.dumps(details, indent=2))
+    if args.server:
+        command = 'python3 /storage/.kodi/addons/plugin.video.silo/auth.py configure --profile-dir /storage/.kodi/userdata/addon_data/plugin.video.silo --server ' + shlex.quote(args.server)
+        # Server configuration is explicit; credentials remain in the add-on's
+        # private data directory and are preserved when the URL is unchanged.
+        ssh(args, command)
     browse(args)
 
 
 def browse(args):
     result = rpc(args, "Files.GetDirectory", {
-        "directory": "plugin://plugin.video.silo/", "media": "files",
+        "directory": "plugin://plugin.video.silo/?action=status", "media": "files",
     })
     labels = [item["label"] for item in result["files"]]
     assert "Silo connected — API v2" in labels, labels
@@ -257,6 +265,7 @@ def main():
             parser.error("--{} or its SILO_* environment variable is required".format(name))
     if args.command == "check":
         check()
+        subprocess.run([sys.executable, "-m", "unittest", "discover", "-s", "tests", "-v"], cwd=ROOT, check=True)
     elif args.command == "package":
         package()
     else:

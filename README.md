@@ -2,7 +2,7 @@
 
 A browsing client for Silo, targeting Kodi 21 on CoreELEC. The intended client uses Silo account authentication and profiles, browses libraries on demand, and delegates media playback to Kodi without syncing the catalog into Kodi's library.
 
-**Status:** repository and device-test scaffold. Version `0.0.1` checks Silo connectivity and validates Kodi playback with a temporary local fixture. Silo sign-in, library browsing, and authenticated streaming are not implemented yet.
+**Status:** authentication milestone in validation. Version `0.1.0` provides manual server configuration, QR sign-in, persistent authentication, and profile selection through a Kodi account screen and a shared headless helper. Library browsing and Silo media playback are not implemented yet.
 
 - [Minimal client design](docs/design.md)
 - [Development and target test loop](docs/testing.md)

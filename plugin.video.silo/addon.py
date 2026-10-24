@@ -1,49 +1,47 @@
-"""Installable scaffold for validating the Kodi development loop."""
-
-import json
+"""Kodi entry point; the account UI and headless harness share one session."""
+from pathlib import Path
 import sys
-from urllib.error import URLError
 from urllib.parse import parse_qs
-from urllib.request import urlopen
 
-import xbmc
+sys.path.insert(0, str(Path(__file__).resolve().parent / 'resources/lib'))
+
 import xbmcaddon
 import xbmcgui
 import xbmcplugin
 import xbmcvfs
 
+from silo.client import Error, Session
+
 
 def main():
-    handle = int(sys.argv[1])
-    action = parse_qs(sys.argv[2].lstrip("?")).get("action", [""])[0]
-
-    if action == "smoke":
-        # The development harness creates this fixture; it is never packaged.
-        path = "special://temp/silo-kodi-smoke.wav"
+    handle = int(sys.argv[1]) if len(sys.argv) > 1 and sys.argv[1].isdigit() else -1
+    query = parse_qs(sys.argv[2].lstrip('?')) if len(sys.argv) > 2 else {}
+    action = query.get('action', [''])[0]
+    if action == 'smoke':
+        path = 'special://temp/silo-kodi-smoke.wav'
         item = xbmcgui.ListItem(path=path)
-        item.setMimeType("audio/wav")
+        item.setMimeType('audio/wav')
         item.setContentLookup(False)
         xbmcplugin.setResolvedUrl(handle, xbmcvfs.exists(path), item)
         return
+    if action == 'status':
+        directory = xbmcvfs.translatePath(xbmcaddon.Addon().getAddonInfo('profile'))
+        session = Session.open(directory)
+        label = 'Silo: server not configured'
+        if session:
+            try:
+                session.public('/system/info')
+                label = 'Silo connected — API v2'
+            except Error:
+                label = 'Silo: server unavailable'
+        xbmcplugin.addDirectoryItem(handle, '', xbmcgui.ListItem(label=label), isFolder=False)
+        xbmcplugin.endOfDirectory(handle, cacheToDisc=False)
+        return
+    if handle >= 0:
+        xbmcplugin.endOfDirectory(handle, cacheToDisc=False)
+    from silo.ui import open_account
+    open_account()
 
-    xbmcplugin.setPluginCategory(handle, "Silo")
-    xbmcplugin.setContent(handle, "files")
-    server = xbmcaddon.Addon().getSetting("server_url").rstrip("/")
-    try:
-        if not server:
-            raise ValueError("Server URL is not configured")
-        with urlopen(server + "/api/v2/system/info", timeout=10) as response:
-            info = json.load(response)
-        label = "Silo connected — API v{}".format(info["api_major"])
-    except (URLError, TimeoutError, ValueError, KeyError):
-        label = "Silo unavailable — check the server connection" if server else "Set Server URL in Silo settings"
-        xbmc.log("Silo: server probe failed", xbmc.LOGWARNING)
 
-    for label in (label, "Setup build: sign-in and browsing are not implemented yet"):
-        item = xbmcgui.ListItem(label=label)
-        xbmcplugin.addDirectoryItem(handle, "", item, isFolder=False)
-    xbmcplugin.endOfDirectory(handle, cacheToDisc=False)
-
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

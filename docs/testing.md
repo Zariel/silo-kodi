@@ -1,6 +1,6 @@
 # Test on CoreELEC
 
-Use the development loop below to validate code through the actual Kodi interpreter and player. The setup build probes the public Silo API and plays a temporary local silent WAV. It does not authenticate, browse libraries, or stream Silo media yet.
+Use the development loop below to validate code through the actual Kodi interpreter and player. The authentication build provides a Kodi account screen and a headless helper using the same credential store and API client. Browsing and Silo media playback remain unimplemented; the player smoke test uses a temporary local silent WAV.
 
 ## Prerequisites
 
@@ -16,7 +16,7 @@ export SILO_RPC_URL=http://kodi.example.test:8080/jsonrpc
 export SILO_SERVER_URL=https://silo.example.test
 ```
 
-Source the file from the repository root with `. .local-testing/env.sh`. Optional `SILO_SSH_OPTIONS` supplies SSH arguments, such as a local config or known-hosts file. Establish and verify the target host key before unattended deployment; do not disable host-key checking. Configure **Server URL** in the Silo add-on's Kodi settings before running the connectivity check. The add-on has no packaged server default.
+Source the file from the repository root with `. .local-testing/env.sh`. Optional `SILO_SSH_OPTIONS` supplies SSH arguments, such as a local config or known-hosts file. Establish and verify the target host key before unattended deployment; do not disable host-key checking. Configure **Server address** on the Silo account screen, or set `SILO_SERVER_URL` before deployment to configure it through the headless helper. The add-on has no packaged server default.
 
 If Nix cannot write its cache in a restricted workspace, set `XDG_CACHE_HOME=/tmp/silo-kodi-cache` for the Nix command.
 
@@ -32,11 +32,11 @@ python scripts/dev.py deploy
 python scripts/dev.py smoke
 ```
 
-`check` validates the manifest, entry point, and Python 3.11 syntax. `package` writes a deterministic ZIP to `dist/`, containing only the explicit add-on file allowlist. Extend that list when adding resources. Scratch space and credentials cannot enter the ZIP through a recursive directory walk.
+`check` validates the manifest, XML resources, and Python 3.11 syntax, then runs the authentication contract tests. `package` writes a deterministic ZIP to `dist/`, containing only the explicit add-on file allowlist. Extend that list when adding resources. Scratch space and credentials cannot enter the ZIP through a recursive directory walk.
 
 `probe` reads OS, interpreter, Kodi version, active players, HDMI capability files, Ethernet link speed, and Silo's public server identity. Capture raw results under `.scratch/`, not in version control.
 
-`deploy` refuses to run while Kodi is playing. It copies and verifies the ZIP by SHA-256, extracts a fresh add-on tree, and saves the previous tree at `/storage/.kodi/temp/silo-kodi-previous`. It asks Kodi to rescan and enable the add-on through supported interfaces, then executes its directory through `Files.GetDirectory`. No Kodi restart or SQLite edits are needed. The backup holds only the previous deployment and is replaced on the next deploy. User data under `userdata/addon_data` is untouched.
+`deploy` refuses to run while Kodi is playing. It copies and verifies the ZIP by SHA-256, extracts a fresh add-on tree, and saves the previous tree at `/storage/.kodi/temp/silo-kodi-previous`. It asks Kodi to rescan and enable the add-on through supported interfaces, waits for the expected version, then executes its status route through `Files.GetDirectory`. No Kodi restart or SQLite edits are needed. The backup holds only the previous deployment and is replaced on the next deploy. Deployment preserves user data under `userdata/addon_data`. When `--server` or `SILO_SERVER_URL` is set, it configures that server through the shared helper; using the same URL preserves login, while changing it clears origin-bound credentials.
 
 `smoke` also refuses to interrupt existing playback. It creates a 120-second silent stereo WAV in Kodi's temporary directory, opens the hidden development route `plugin://plugin.video.silo/?action=smoke`, and observes the resolved file, player readiness, a stable paused clock, a seek to 45 seconds, resumed clock advancement, and stop. It removes the fixture in cleanup. It stops only the fixture if another client takes over during cleanup. The development route is not listed in the add-on UI and must be removed when real playback replaces the scaffold.
 
@@ -48,13 +48,37 @@ You can override either target:
 python scripts/dev.py probe --ssh root@kodi.example.test --rpc http://kodi.example.test:8080/jsonrpc --server https://silo.example.test
 ```
 
-To open the UI, use **Add-ons > Video add-ons > Silo** (it is also an audio provider). Expect a server connectivity row and a setup-build notice. To read relevant logs:
+To open the account screen, use **Add-ons > Video add-ons > Silo**. Enter your server address, choose **Sign in**, and approve the QR code through Silo in your browser. Then choose a profile. The add-on is a video provider; audio support refers to soundtracks within video files. To read relevant logs:
 
 ```sh
 ssh $SILO_SSH_OPTIONS "$SILO_SSH_TARGET" 'tail -n 150 /storage/.kodi/temp/kodi.log'
 ```
 
 Before sharing logs after authentication is implemented, redact signed stream URLs, tokens, pairing codes, and private titles. Do not enable verbose HTTP logging as a routine test setting.
+
+## Test authentication without the TV
+
+The packaged `auth.py` helper uses the same implementation and protected credential store as the account screen. Run it on the target over SSH to keep tokens on the device:
+
+```sh
+ssh $SILO_SSH_OPTIONS "$SILO_SSH_TARGET" 'python3 /storage/.kodi/addons/plugin.video.silo/auth.py pair --profile-dir /storage/.kodi/userdata/addon_data/plugin.video.silo'
+```
+
+Open the returned verification link and approve **Silo Kodi**. The output includes a QR image path if you prefer to copy the image to ignored local storage. It does not include tokens or the secret polling code. Leave the Kodi account screen closed during this headless check; closing that screen cancels its pending sign-in.
+
+Poll until the returned status is `approved`, respecting `poll_after` when present:
+
+```sh
+ssh $SILO_SSH_OPTIONS "$SILO_SSH_TARGET" 'python3 /storage/.kodi/addons/plugin.video.silo/auth.py poll --profile-dir /storage/.kodi/userdata/addon_data/plugin.video.silo'
+```
+
+Replace `poll` with `profiles` to list account profiles, then use `select --profile-id PROFILE_ID` to select one. For PIN entry, allocate an interactive SSH terminal with `-t`; the helper prompts without echoing the PIN. Use `verify` to make authenticated account, profile, and library requests, and `status` to inspect the persisted selection. These commands never print access or refresh tokens.
+
+Use `cancel` to cancel pending pairing. Use `logout` only when you intend to sign out of this installation. Redeploy and run `verify` again to check persistence. A new helper process verifies process-independent storage, but does not substitute for a separate Kodi restart acceptance test.
+
+For isolated workstation tests, run `python plugin.video.silo/auth.py configure --server "$SILO_SERVER_URL" --profile-dir .local-testing/test-account`, then use the same commands and directory. This creates a separate Silo device login and requires browser approval. It is not an authentication bypass.
+
+Keep screenshots brief on OLED displays and return to the existing screensaver after visual checks. Decode a captured QR independently and exercise directional navigation, cancellation, and profile selection on Kodi; the headless helper alone cannot prove those UI behaviors.
 
 ## Restore the previous development build
 
@@ -65,7 +89,7 @@ ssh $SILO_SSH_OPTIONS "$SILO_SSH_TARGET" 'test -d /storage/.kodi/temp/silo-kodi-
 python scripts/dev.py browse
 ```
 
-The connectivity assertion applies to this scaffold; change it when the real root directory replaces the setup notice. If there is no backup, uninstall **Silo** using Kodi's add-on manager. No cluster changes need rollback.
+`browse` invokes a nonvisual status route to check connectivity without opening the account screen. If there is no backup, uninstall **Silo** using Kodi's add-on manager. No cluster changes need rollback.
 
 ## Qualify real Silo playback
 

@@ -1,6 +1,6 @@
 # Minimal Silo Kodi client
 
-Status: implementation proposal, grounded in the Silo v2 contract. The repository contains a development scaffold, not the client described below.
+Status: authentication is implemented and undergoing device acceptance. Browsing and playback remain planned. This document describes the complete intended client, grounded in the Silo v2 contract.
 
 ## Requirement and boundaries
 
