@@ -128,7 +128,7 @@ Keep bitrate unbounded by arbitrary client defaults, while honoring server polic
 
 ## Delivery sequence and acceptance
 
-Deliver these five milestones in order. Each milestone must have a reproducible local acceptance check and small logical commits. UI work starts with the login screen and grows with browsing; a separate full browsing prototype is not a prerequisite for authentication.
+Deliver these six milestones in order. Each milestone must have a reproducible local acceptance check and small logical commits. UI work starts with the login screen and grows with browsing; a separate full browsing prototype is not a prerequisite for authentication.
 
 ### 1. Authentication
 
@@ -175,6 +175,14 @@ The [quality playback design](quality-playback.md) records the native HLS target
 - Implement supported delivery/replan paths needed for those choices, preserving position and session semantics. Do not assume progressive remux offers arbitrary seeking or that quality adaptation preserves Dolby Vision/FEL.
 - Add explicit subtitle choices, Off, language/forced/default behavior, and external subtitle delivery where supported. Embedded tracks Kodi already exposes may work earlier; this milestone owns the complete selection behavior. Validate text and bitmap subtitles and any server-required burn-in path before claiming them.
 - **Acceptance:** change quality and subtitles on representative files, verify the actual resulting stream and position, and handle unavailable choices without a silent downgrade or playback loop.
+
+### 6. Silo Home as the main page
+
+- Open Home after sign-in and profile selection. Keep libraries and profile switching accessible from the main navigation. Follow the Silo TV references and server-configured accent, reusing existing cards, details, and playback actions.
+- Fetch the acting profile's section layout from `GET /api/v2/home/layout` and load cards through `/api/v2/home/sections/{id}/items`. Preserve server ordering and visibility, including supported custom sections. Use `/api/v2/home/capabilities` to negotiate optional features such as including the first rows' cards with the layout.
+- If the layout endpoint is unsupported, use `/api/v2/home/sections` where available. If the server cannot provide ordering, use Silo's default section order, documented against the upstream implementation at implementation time. Fetch content from supported server APIs; do not create a local catalog, recommendation engine, or watch-state store. Authentication failures and temporary network errors must remain explicit errors, not trigger a compatibility fallback.
+- Load rows on demand, handle empty and unsupported sections, and preserve remote focus when returning from details or playback. Refresh server-owned progress after playback and discard the previous profile's Home state on profile changes. Home editing and section reordering are outside this milestone.
+- **Acceptance:** Home is the entry screen; supported rows follow the profile's server layout; selecting a card reaches the correct details and playback flow. Verify remote navigation, row pagination where supported, return focus, updated Continue Watching, empty/error states, profile isolation, and the default-order compatibility fallback.
 
 ### Cross-cutting work and future work
 
