@@ -82,8 +82,25 @@ class Catalog:
                            if str(row['id']) == str(section_id)), None)
             if result is None:
                 raise Error('home_section_unavailable') from None
+        return self._home_cards(result)
+
+    def _home_cards(self, result):
+        if result.get('section_type') in ('continue_watching', 'in_progress', 'next_up'):
+            # Section cards are capped by the Home recipe; catalog supplies the
+            # complete ordered collection and an opaque continuation cursor.
+            return dict(result, **self.home_page(result['id']))
         return dict(result, items=[item for item in result['items']
                                    if item.get('type') in ('movie', 'series', 'episode')])
+
+    def home_content(self, sections):
+        try:
+            rows = {str(row['id']): row for row in self._get('/home/sections')['sections']}
+        except Error as exc:
+            if exc.status not in (404, 405, 501):
+                raise
+            rows = {}
+        return [self._home_cards(rows[str(section['id'])]) if str(section['id']) in rows
+                else self.home_section(section['id']) for section in sections]
 
     def home_page(self, section_id, cursor=None):
         query = {'source': 'section', 'scope': 'home', 'section_id': section_id, 'limit': 50,

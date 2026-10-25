@@ -66,3 +66,9 @@ A temporary wrapper delays the first Home request by six seconds while using the
 ## Partial rows as scroll cues
 
 Framebuffer captures from the installed add-on show two complete Home shelves plus the next shelf's heading and clipped artwork, three complete grid rows plus part of the fourth, and three complete episode entries plus part of the fourth. Navigating down promotes the Home preview to the second full shelf and retains card focus. Grid row navigation and TV/season/episode details pass without playback, followed by verified idle protection. Automated tests cover skipping empty shelves and clearing the preview at the end; all 144 tests pass.
+
+## Home preload and horizontal continuation
+
+Home resolves all section cards before rendering and retains them while navigating vertically. The installed browser passes Home preview promotion and library navigation with this preload. A temporary read-only Home fixture uses real catalog pages as a large Continue Watching shelf: automatic paging grows it from 100 to 150 cards without a View all entry or a selection change. A counter independently confirms that vertical navigation invokes Home preload only once. No playback or personal-state mutation is needed; the wrapper closes normally and idle protection is verified.
+
+The shared paging contract covers grids and Home shelves, including duplicate IDs, repeated cursors, profile ownership, replaced shelves, and reassigned screen controls. Returning from details reloads enough of the horizontal collection to restore a selected card beyond the first page. All 152 automated tests pass. The large-shelf device check uses a catalog-backed fixture rather than creating artificial watch history in the user's profile.

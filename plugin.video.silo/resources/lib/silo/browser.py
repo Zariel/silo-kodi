@@ -15,6 +15,21 @@ from .client import Error, Session
 from .ui import open_account, _text
 
 
+def _extend_page(target, data, cursor):
+    seen = target.setdefault('cursors', set())
+    seen.add(cursor)
+    known = {item['content_id'] for item in target['items']}
+    added = []
+    for item in data['items']:
+        if item['content_id'] not in known:
+            known.add(item['content_id'])
+            added.append(item)
+    target['items'].extend(added)
+    next_cursor = data['next_cursor']
+    target['next_cursor'] = next_cursor if next_cursor not in seen else None
+    return added
+
+
 class BrowserWindow(xbmcgui.WindowXML):
     def __init__(self, *args, session, **kwargs):
         super().__init__(*args, **kwargs)
@@ -112,10 +127,20 @@ class BrowserWindow(xbmcgui.WindowXML):
                     'offset': 0, 'positions': {}})
 
     def _home_row(self, page, index):
-        section = page['sections'][index]
-        return self.catalog.home_section(section['id'])
+        return page['rows'][index]
 
-    def _home_rows(self, page):
+    def _home_rows(self, page, refresh):
+        if refresh or 'rows' not in page:
+            rows = self.catalog.home_content(page['sections'])
+            for row in rows:
+                selected = page['positions'].get(row['id'])
+                while (selected and selected != '__all__' and row.get('next_cursor')
+                       and not any(item['content_id'] == selected for item in row['items'])):
+                    if self.closed.is_set():
+                        return [], 0
+                    cursor = row['next_cursor']
+                    _extend_page(row, self.catalog.home_page(row['id'], cursor), cursor)
+            page['rows'] = rows
         visible = []
         index = page['offset']
         while index < len(page['sections']) and len(visible) < 3:
@@ -137,7 +162,8 @@ class BrowserWindow(xbmcgui.WindowXML):
             _, row = visible[slot]
             self.getControl(40 + slot).setLabel(_text(row['title']))
             cards = [self._card(data) for data in row['items']]
-            cards.append(xbmcgui.ListItem('View all'))
+            if row.get('section_type') not in ('continue_watching', 'in_progress', 'next_up'):
+                cards.append(xbmcgui.ListItem('View all'))
             control.reset()
             control.addItems(cards)
             selected = page['positions'].get(row['id'])
@@ -171,7 +197,7 @@ class BrowserWindow(xbmcgui.WindowXML):
             elif page['next_row'] < len(page['sections']):
                 page['offset'] = visible[-1][0]
                 page['focus'] = 231
-                self._show(page)
+                self._show(page, refresh=False)
         elif slot == 1:
             self.setFocusId(230)
         elif visible and visible[0][0] > 0:
@@ -180,7 +206,7 @@ class BrowserWindow(xbmcgui.WindowXML):
                 index -= 1
             page['offset'] = index
             page['focus'] = 230
-            self._show(page)
+            self._show(page, refresh=False)
         else:
             self.setFocusId(100)
 
@@ -336,12 +362,12 @@ class BrowserWindow(xbmcgui.WindowXML):
         item.setProperty('meta', _text(' · '.join(meta)))
         return item
 
-    def _show(self, page):
+    def _show(self, page, refresh=True):
         if self.closed.is_set():
             return
         # Keep the current controls and focus valid while fetching Home rows.
         # Emptying a focused shelf makes Kodi fall back to the default sidebar.
-        rows = self._home_rows(page) if page['kind'] == 'home' else None
+        rows = self._home_rows(page, refresh) if page['kind'] == 'home' else None
         if self.closed.is_set():
             return
         profile = self.session.status()['profile']
@@ -443,28 +469,55 @@ class BrowserWindow(xbmcgui.WindowXML):
                     page['paging_failed'] = True
                 xbmc.log('Silo: background paging failed', xbmc.LOGERROR)
 
+    def _paging_current(self, page, target, control_id):
+        if self.closed.is_set() or self.busy or self.page is not page:
+            return False
+        if page['kind'] == 'home':
+            slot = control_id - 230
+            rows = page.get('visible', [])
+            if slot >= len(rows) or rows[slot][1] is not target:
+                return False
+        profile = self.session.status()['profile']
+        return profile is not None and profile['id'] == self.catalog.profile_id
+
     def _prefetch(self):
         page = self.page
-        if (self.busy or self.closed.is_set() or not page
-                or page['kind'] not in ('library', 'section', 'search')
-                or not page.get('next_cursor') or page.get('paging_failed')):
+        if self.busy or self.closed.is_set() or not page:
             return
-        control = self.getControl(200)
-        # Keep a full server page plus a screen ahead of the selection.
-        if len(page['items']) - max(0, control.getSelectedPosition()) > 74:
+        target = page
+        control_id = 200
+        control = self.getControl(control_id)
+        if page['kind'] == 'home':
+            for slot, (_, row) in enumerate(page.get('visible', [])):
+                candidate = self.getControl(230 + slot)
+                if (row.get('next_cursor') and not row.get('paging_failed')
+                        and len(row['items']) - max(0, candidate.getSelectedPosition()) <= 58):
+                    target, control = row, candidate
+                    control_id = 230 + slot
+                    break
+            else:
+                return
+        elif page['kind'] not in ('library', 'section', 'search'):
             return
-        cursor = page['next_cursor']
+        if not target.get('next_cursor') or target.get('paging_failed'):
+            return
+        # Keep a server page plus a screen ahead of the selection.
+        if len(target['items']) - max(0, control.getSelectedPosition()) > (58 if page['kind'] == 'home' else 74):
+            return
+        cursor = target['next_cursor']
         try:
-            if page['kind'] == 'section':
+            if page['kind'] == 'home':
+                data = self.catalog.home_page(target['id'], cursor)
+            elif page['kind'] == 'section':
                 data = self.catalog.home_page(page['section'], cursor)
             elif page['kind'] == 'search':
                 data = self.catalog.search(page['query'], cursor)
             else:
                 data = self.catalog.page(page['library']['id'], cursor)
         except Exception:
-            page['paging_failed'] = True
+            target['paging_failed'] = True
             with self.publish_lock:
-                if self.page is page and not self.busy and not self.closed.is_set():
+                if self._paging_current(page, target, control_id):
                     self.getControl(20).setLabel('Could not load more titles. Reopen this page to retry.')
             return
 
@@ -472,31 +525,17 @@ class BrowserWindow(xbmcgui.WindowXML):
             pass
         with self.publish_lock:
             # Navigation owns the controls while a foreground operation is running.
-            if self.closed.is_set() or self.busy or self.page is not page:
+            if not self._paging_current(page, target, control_id):
                 return
-            profile = self.session.status()['profile']
-            if profile is None or profile['id'] != self.catalog.profile_id:
-                page['paging_failed'] = True
-                return
-            seen = page.setdefault('cursors', set())
-            seen.add(cursor)
-            known = {item['content_id'] for item in page['items']}
-            added = []
-            for item in data['items']:
-                if item['content_id'] not in known:
-                    known.add(item['content_id'])
-                    added.append(item)
-            page['items'].extend(added)
+            added = _extend_page(target, data, cursor)
             if added:
                 selection = max(0, control.getSelectedPosition())
                 # Kodi rebinds the entire list on addItems; restore focus in the same message batch.
                 control.addItems([self._card(item) for item in added])
                 control.selectItem(selection)
-            next_cursor = data['next_cursor']
-            page['next_cursor'] = next_cursor if next_cursor not in seen else None
-            if not page['items'] and not page['next_cursor']:
+            if page['kind'] != 'home' and not target['items'] and not target['next_cursor']:
                 self.getControl(21).setLabel('No matching titles.' if page['kind'] == 'search' else 'This library has no visible titles.')
-            if page['items']:
+            if page['kind'] != 'home' and target['items']:
                 self.getControl(100).controlRight(control)
 
     def _play(self):

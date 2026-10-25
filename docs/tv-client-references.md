@@ -15,7 +15,7 @@ Adopt the card action vocabulary, profile-owned state, clear focus, and compact 
 
 Home starts with the sidebar expanded. The first Up, Down, or Right enters the first shelf and collapses the sidebar; Left keeps the sidebar available for normal menu navigation. Returning to the sidebar with Left lets Up and Down select its entries.
 
-Fetch Home shelves before changing the visible controls, then bind each complete card list in one batch. Keep the old shelves visible on a slow or failed fetch, and preserve explicit sidebar navigation during loading.
+Preload all Home shelves before changing the visible controls, using the aggregate sections response in layout order. Fall back to individual section reads only when necessary. Vertical navigation reuses this in-memory snapshot; returning from details, playback, or a personal action refreshes it. Bind each complete card list in one batch. Keep the old shelves visible on a slow or failed fetch, and preserve explicit sidebar navigation during loading.
 
 Keep the content canvas stationary. The expanded rail overlays the left edge instead of shifting every card, label, and button on each focus transition. Use separate native list layouts for expanded labels and the compact selection marker, with identical row heights. Icons remain part of the native list items; Kodi owns scrolling and selection. A short opacity transition emphasizes navigation focus. Icons use 128-pixel assets for scaling, with paths rooted in the add-on.
 
@@ -28,3 +28,8 @@ Kodi's context-menu action opens options for the focused title. Physical hold-to
 Refresh membership from Silo after an action. Replace a section's page identity and cursor when refreshing so an older in-flight page cannot reinsert removed cards. Home refreshes its visible shelves and keeps focus on an available card. Sidebar controls and season containers do not target the detail title's personal actions. No deletion, server administration, or custom global keymap is introduced.
 
 Keep upstream snapshots, screenshots, fixture identities, and raw acceptance output in ignored local storage.
+
+
+## Home horizontal paging
+
+Continue Watching, In Progress, and Next Up have no **View all** card. Their first catalog page replaces the recipe-limited card list, retaining the section metadata and opaque cursor. The shared pager fetches a page plus one screen ahead, appends unique content IDs without moving selection, and rejects results or errors belonging to a replaced page, shelf, or profile. Home navigation keeps loaded pages in memory. A refresh fetches enough pages to restore the previously selected card when it remains present; repeated cursors terminate paging. Kodi owns artwork loading from the supplied URLs.

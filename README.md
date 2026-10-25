@@ -24,7 +24,7 @@ Use **Account** in the sidebar to switch profiles or sign out. Stop playback bef
 
 ## Browse and search
 
-Home shows your Silo sections in their configured order and uses your Silo accent colour. Choose **View all** to explore a section, or select a library from the sidebar. More titles load automatically as you scroll.
+Home shows your Silo sections in their configured order and uses your Silo accent colour. Home preloads its shelves so you can move between them without waiting for another request. Continue Watching loads more cards automatically as you scroll across. For other sections, choose **View all**, or select a library from the sidebar. More titles load automatically as you scroll.
 
 Choose **Search** to find movies, TV shows, and episodes when supported by your server. Select a title to view its details, or open a TV show to browse its seasons and episodes.
 

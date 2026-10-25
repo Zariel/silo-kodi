@@ -279,3 +279,28 @@ class SearchAndActions(unittest.TestCase):
             with self.subTest(surface=surface, anchor=anchor), self.assertRaises(Error):
                 catalog.dismiss_home('episode/a', surface, anchor)
         session.request.assert_not_called()
+
+    def test_home_preload_preserves_layout_order_and_pages_progress(self):
+        session = Session()
+        session.responses['/home/sections'] = {'sections': [
+            {'id': 'recent', 'items': [{'content_id': 'r', 'type': 'movie'}]},
+            {'id': 'watching', 'section_type': 'continue_watching', 'items': []}]}
+        session.responses['/catalog?source=section&scope=home&section_id=watching&limit=50&skip_total=true'] = {
+            'items': [{'content_id': 'episode', 'type': 'episode'}], 'page': {'next_cursor': 'opaque'}}
+        rows = Catalog(session).home_content([{'id': 'watching'}, {'id': 'recent'}])
+        self.assertEqual([row['id'] for row in rows], ['watching', 'recent'])
+        self.assertEqual(rows[0]['items'], [{'content_id': 'episode', 'type': 'episode'}])
+        self.assertEqual(rows[0]['next_cursor'], 'opaque')
+        self.assertEqual(len(session.requests), 2)
+
+    def test_home_preload_falls_back_only_for_unsupported_aggregate(self):
+        for status in (404, 503):
+            session = Session()
+            session.responses['/home/sections'] = Error('unavailable', status)
+            session.responses['/home/sections/one/items'] = {'id': 'one', 'items': []}
+            if status == 404:
+                self.assertEqual(Catalog(session).home_content([{'id': 'one'}]), [{'id': 'one', 'items': []}])
+            else:
+                with self.assertRaises(Error):
+                    Catalog(session).home_content([{'id': 'one'}])
+                self.assertEqual(session.requests, ['/home/sections'])
