@@ -118,7 +118,7 @@ class BrowserWindow(xbmcgui.WindowXML):
     def _home_rows(self, page):
         visible = []
         index = page['offset']
-        while index < len(page['sections']) and len(visible) < 2:
+        while index < len(page['sections']) and len(visible) < 3:
             row = self._home_row(page, index)
             if row['items']:
                 visible.append((index, row))
@@ -126,9 +126,9 @@ class BrowserWindow(xbmcgui.WindowXML):
         return visible, index
 
     def _show_home(self, page, visible, index):
-        page['visible'] = visible
-        page['next_row'] = index
-        for slot in range(2):
+        page['visible'] = visible[:2]
+        page['next_row'] = visible[2][0] if len(visible) > 2 else index
+        for slot in range(3):
             control = self.getControl(230 + slot)
             self.getControl(40 + slot).setLabel('')
             if slot >= len(visible):
@@ -358,7 +358,7 @@ class BrowserWindow(xbmcgui.WindowXML):
         self.getControl(22).setText('')
         self.getControl(30).setImage('')
         self.getControl(31).setImage('')
-        for identifier in ((200, 210, 220) if kind == 'home' else (200, 210, 220, 230, 231)):
+        for identifier in ((200, 210, 220) if kind == 'home' else (200, 210, 220, 230, 231, 232)):
             self.getControl(identifier).reset()
         self.getControl(300).setVisible(False)
         self.getControl(301).setVisible(kind in ('item', 'season'))

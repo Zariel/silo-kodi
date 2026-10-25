@@ -1,6 +1,6 @@
 # TV browsing references
 
-The Kodi browser uses a 1920×1080 design canvas that Kodi scales to the configured GUI resolution. Density is a layout choice: the library and search grid has eight columns and three visible rows at either output resolution. Home retains two server-defined horizontal shelves. Detail text and actions use smaller type and tighter spacing.
+The Kodi browser uses a 1920×1080 design canvas that Kodi scales to the configured GUI resolution. Density is a layout choice: the library and search grid has eight columns and three complete rows plus a clipped preview of the next row at either output resolution. Episode lists also show part of the next item. Home retains two complete server-defined horizontal shelves and previews the next non-empty shelf below them. The preview disappears at the end and becomes a complete shelf when navigating down. Detail text and actions use smaller type and tighter spacing.
 
 ## Official client review
 

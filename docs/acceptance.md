@@ -62,3 +62,7 @@ The automated suite passes 135 tests, including dismissal anchors, profile owner
 A device trace reproduced sidebar focus in 27 of 60 samples while scrolling downward through Home shelves without Left input. Home now fetches replacement shelves before clearing controls and binds each complete list in a batch. The same check records zero sidebar jumps in 60 samples. Home starts expanded; Down enters the cards, and Left restores normal sidebar navigation.
 
 A temporary wrapper delays the first Home request by six seconds while using the installed browser and real catalog. Down during that delay enters the cards when loading completes. Subsequent sidebar navigation and Right into the cards pass. The wrapper closes normally and idle protection is verified. The automated suite passes 142 tests, covering initial directions, explicit Left, deferred focus, failed fetches, and visible shelves during refresh.
+
+## Partial rows as scroll cues
+
+Framebuffer captures from the installed add-on show two complete Home shelves plus the next shelf's heading and clipped artwork, three complete grid rows plus part of the fourth, and three complete episode entries plus part of the fourth. Navigating down promotes the Home preview to the second full shelf and retains card focus. Grid row navigation and TV/season/episode details pass without playback, followed by verified idle protection. Automated tests cover skipping empty shelves and clearing the preview at the end; all 144 tests pass.

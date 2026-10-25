@@ -495,3 +495,25 @@ class HomeNavigation(unittest.TestCase):
         self.catalog.home_section.side_effect = fetch
         self.window.onClick(100)
         self.assertEqual(self.window.getFocusId(), 230)
+
+    def test_home_preview_becomes_next_shelf_without_skipping_empty_rows(self):
+        self.rows['third'] = {'id': 'third', 'title': 'Third', 'items': [self.card('d')]}
+        self.catalog.home.return_value = [{'id': key} for key in self.rows]
+        self.open_home()
+        self.assertEqual(self.window.getControl(42).label, 'Third')
+        self.assertEqual(self.window.getControl(232).items[0].label, 'd')
+
+        self.window.onAction(SimpleNamespace(getId=lambda: 4))
+        self.window.onAction(SimpleNamespace(getId=lambda: 4))
+        self.assertEqual(self.window.getControl(41).label, 'Third')
+        self.assertEqual(self.window.getControl(231).items[0].label, 'd')
+        self.assertEqual(self.window.getFocusId(), 231)
+        self.assertEqual(self.window.getControl(42).label, '')
+        self.assertEqual(self.window.getControl(232).items, [])
+
+    def test_home_does_not_preview_empty_remaining_shelves(self):
+        self.rows['trailing-empty'] = {'id': 'trailing-empty', 'title': 'Empty', 'items': []}
+        self.catalog.home.return_value = [{'id': key} for key in self.rows]
+        self.open_home()
+        self.assertEqual(self.window.getControl(42).label, '')
+        self.assertEqual(self.window.getControl(232).items, [])
