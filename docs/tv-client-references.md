@@ -15,7 +15,7 @@ Adopt the card action vocabulary, profile-owned state, clear focus, and compact 
 
 Home starts with the sidebar expanded. The first Up, Down, or Right enters the first shelf and collapses the sidebar; Left keeps the sidebar available for normal menu navigation. Returning to the sidebar with Left lets Up and Down select its entries.
 
-Preload all Home shelves before changing the visible controls, using the aggregate sections response in layout order. Fall back to individual section reads only when necessary. Vertical navigation reuses this in-memory snapshot; returning from details, playback, or a personal action refreshes it. Bind each complete card list in one batch. Keep the old shelves visible on a slow or failed fetch, and preserve explicit sidebar navigation during loading.
+Preload all Home shelves before changing the visible controls, using the aggregate sections response in layout order. Fall back to individual section reads only when necessary. Vertical navigation reuses this in-memory snapshot; returning from details reuses cached catalog responses; playback return and personal actions invalidate those responses before refreshing. Bind each complete card list in one batch. Keep the old shelves visible on a slow or failed fetch, and preserve explicit sidebar navigation during loading.
 
 All browser views live inside one content group. `_BrowserLayout` owns the sidebar inset, flexible control widths, and menu input bounds. The expanded sidebar reserves 360 design pixels; the compact rail reserves 120. Content coordinates are relative to that region, and resizing preserves the right margin and intrinsic poster/button sizes. Kodi reflows grid columns while horizontal shelves retain their card widths. Episode rows fit the minimum available width so their text is never clipped by a smaller container.
 
@@ -35,3 +35,12 @@ Keep upstream snapshots, screenshots, fixture identities, and raw acceptance out
 ## Home horizontal paging
 
 Continue Watching, In Progress, and Next Up have no **View all** card. Their first catalog page replaces the recipe-limited card list, retaining the section metadata and opaque cursor. The shared pager fetches a page plus one screen ahead, appends unique content IDs without moving selection, and rejects results or errors belonging to a replaced page, shelf, or profile. Home navigation keeps loaded pages in memory. A refresh fetches enough pages to restore the previously selected card when it remains present; repeated cursors terminate paging. Kodi owns artwork loading from the supplied URLs.
+
+
+## Browsing caches and artwork preparation
+
+A browser's Catalog keeps up to 128 response snapshots for five minutes, bound to its originating profile. Reads return independent copies so paging and UI state cannot modify the cached response. Mutations clear the cache and advance its generation: an earlier in-flight read cannot repopulate an invalidated cache. Playback/window restoration clears it before refreshing. Watch requests and personal-action detail reads always go to the server; cached detail metadata is only for display.
+
+The browser supplies poster, backdrop, and episode-still widths based on Kodi's GUI scale. It eagerly warms Kodi's persistent texture cache through `xbmcvfs.File(image://...)`, using two workers and preserving each signed URL intact. Home prioritizes the first screen of every shelf before the remaining cards; grids enqueue their fetched pages. Kodi owns decoding, persistent cache storage, concurrent-image deduplication, and normal rendering retries. Closing the window cancels pending warm-up work. The add-on does not create a second image store or attach account credentials to artwork requests.
+
+Routine browsing has no loading label. Existing content remains visible while fetching, and grids bind each page in a batch. Request failures still provide an error message.

@@ -11,6 +11,7 @@ import xbmcvfs
 
 from .catalog import Catalog, artwork
 from .layout import _BrowserLayout
+from .artwork import _ArtworkPreloader
 from .controls import active_playback, playback_options
 from .client import Error, Session
 from .ui import open_account, _text
@@ -35,7 +36,7 @@ class BrowserWindow(xbmcgui.WindowXML):
     def __init__(self, *args, session, **kwargs):
         super().__init__(*args, **kwargs)
         self.session = session
-        self.catalog = Catalog(session)
+        self.catalog = Catalog(session, cache_reads=True)
         self.libraries = []
         self.history = []
         self.page = None
@@ -50,8 +51,12 @@ class BrowserWindow(xbmcgui.WindowXML):
         self.pager = None
         self.publish_lock = threading.Lock()
         self.layout = None
+        self.artwork = None
 
     def onInit(self):
+        if self.artwork is None:
+            self.artwork = _ArtworkPreloader()
+        self.catalog.artwork_scale = max(1, xbmcgui.getScreenWidth() / 1920)
         if self.layout is None:
             self.layout = _BrowserLayout(self)
         self.layout.apply(True)
@@ -60,6 +65,7 @@ class BrowserWindow(xbmcgui.WindowXML):
             self.pager.start()
         if self.page:
             def restore():
+                self.catalog.invalidate()
                 self._menu()
                 self._show(self.page)
             self._task(restore)
@@ -73,7 +79,7 @@ class BrowserWindow(xbmcgui.WindowXML):
                 return
             self.busy = True
             self.keep_sidebar_focus = False
-        self.getControl(20).setLabel('Loading…')
+        self.getControl(20).setLabel('')
         def work():
             try:
                 operation()
@@ -146,6 +152,9 @@ class BrowserWindow(xbmcgui.WindowXML):
                     cursor = row['next_cursor']
                     _extend_page(row, self.catalog.home_page(row['id'], cursor), cursor)
             page['rows'] = rows
+            # Prioritise the first screen of every shelf before their tails.
+            self._warm_artwork([item for row in rows for item in row['items'][:8]])
+            self._warm_artwork([item for row in rows for item in row['items'][8:]])
         visible = []
         index = page['offset']
         while index < len(page['sections']) and len(visible) < 3:
@@ -351,6 +360,11 @@ class BrowserWindow(xbmcgui.WindowXML):
             self.history.append(self.page)
         self._show(page)
 
+    def _warm_artwork(self, items):
+        if self.artwork is not None:
+            self.artwork.add(artwork(self.session.server, item.get(key))
+                             for item in items for key in ('poster_url', 'still_url'))
+
     def _card(self, data, label=None, art_key='poster_url'):
         item = xbmcgui.ListItem(_text(label or data.get('title') or 'Untitled'))
         item.setArt({'poster': artwork(self.session.server, data.get(art_key))})
@@ -396,11 +410,11 @@ class BrowserWindow(xbmcgui.WindowXML):
         if kind == 'home':
             self._show_home(page, *rows)
             return
+        self._warm_artwork(page.get('items', []))
         if kind in ('library', 'section', 'search'):
             control_id = 200
             control = self.getControl(control_id)
-            for data in page['items']:
-                control.addItem(self._card(data))
+            control.addItems([self._card(data) for data in page['items']])
             if not page['items'] and not page.get('next_cursor'):
                 self.getControl(21).setLabel('No matching titles.' if page['kind'] == 'search' else 'This library has no visible titles.')
         else:
@@ -451,7 +465,7 @@ class BrowserWindow(xbmcgui.WindowXML):
             self.getControl(300).controlRight(self.getControl(301))
 
     def _detail(self, content_id):
-        data = self.catalog.item(content_id)
+        data = self.catalog.item(content_id, fresh=False)
         if data.get('type') not in ('movie', 'series', 'episode'):
             raise Error('invalid_response')
         seasons = self.catalog.seasons(content_id) if data['type'] == 'series' else []
@@ -533,6 +547,7 @@ class BrowserWindow(xbmcgui.WindowXML):
             if not self._paging_current(page, target, control_id):
                 return
             added = _extend_page(target, data, cursor)
+            self._warm_artwork(added)
             if added:
                 selection = max(0, control.getSelectedPosition())
                 # Kodi rebinds the entire list on addItems; restore focus in the same message batch.
@@ -687,10 +702,14 @@ class BrowserWindow(xbmcgui.WindowXML):
 
     def close(self):
         self.closed.set()
+        if self.artwork is not None:
+            self.artwork.close()
         super().close()
 
     def finish(self):
         self.closed.set()
+        if self.artwork is not None:
+            self.artwork.close()
         if self.worker:
             self.worker.join(timeout=35)
         if self.pager:

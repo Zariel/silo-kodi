@@ -1,4 +1,8 @@
 """Profile-bound, on-demand catalog reads. No local catalog or API credentials in art."""
+from copy import deepcopy
+import math
+import time
+import threading
 from urllib.parse import quote, urlencode, urljoin, urlsplit
 
 from .client import Error
@@ -30,18 +34,50 @@ def artwork(server, value):
 
 
 class Catalog:
-    def __init__(self, session):
+    def __init__(self, session, cache_reads=False):
         self.session = session
         profile = session.status()['profile']
         if not profile:
             raise Error('profile_required')
         self.profile_id = profile['id']
         self._search_type = None
+        self.cache_reads = cache_reads
+        self.artwork_scale = 0
+        self._cache = {}
+        self._cache_lock = threading.Lock()
+        self._generation = 0
 
-    def _get(self, path, query=None):
+    def invalidate(self):
+        with self._cache_lock:
+            self._cache.clear()
+            self._generation += 1
+
+    def _get(self, path, query=None, fresh=False):
+        cacheable = path.startswith(('/catalog', '/home/')) and not fresh
+        if self.artwork_scale and path.startswith(('/catalog', '/home/sections')) and path != '/catalog/search/capabilities':
+            query = dict(query or {}, poster_width=math.ceil(280 * self.artwork_scale),
+                         backdrop_width=math.ceil(1920 * self.artwork_scale), still_width=math.ceil(250 * self.artwork_scale))
         if query:
             path += '?' + urlencode(query)
-        return self.session.request('GET', path, expected_profile=self.profile_id)
+        if self.cache_reads and cacheable:
+            profile = self.session.status()['profile']
+            if not profile or profile['id'] != self.profile_id:
+                raise Error('profile_changed')
+            with self._cache_lock:
+                generation = self._generation
+                cached = self._cache.get(path)
+            if cached and cached[0] > time.monotonic():
+                return deepcopy(cached[1])
+        result = self.session.request('GET', path, expected_profile=self.profile_id)
+        if self.cache_reads and cacheable:
+            snapshot = deepcopy(result)
+            with self._cache_lock:
+                # A read started before a mutation must not repopulate its cache.
+                if generation == self._generation:
+                    if len(self._cache) >= 128:
+                        self._cache.pop(next(iter(self._cache)))
+                    self._cache[path] = (time.monotonic() + 300, snapshot)
+        return result
 
     def libraries(self):
         settings = self._get('/settings/values/effective', {'keys': 'ui.disabled_library_ids'})['items']
@@ -149,14 +185,15 @@ class Catalog:
         self.session.request(method if enabled else 'DELETE',
                              '/' + path + '/' + quote(str(content_id), safe=''),
                              expected_profile=self.profile_id)
+        self.invalidate()
         # Re-read authoritative state before presenting the mutation as complete.
         item = self.item(content_id)
         if item.get('user_state', {}).get(field) is not enabled:
             raise Error('invalid_response')
         return item
 
-    def item(self, content_id):
-        return self._get('/catalog/items/' + quote(str(content_id), safe=''))
+    def item(self, content_id, fresh=True):
+        return self._get('/catalog/items/' + quote(str(content_id), safe=''), fresh=fresh)
 
     def dismiss_home(self, content_id, surface, anchor):
         field = {'continue_watching': 'progress_updated_at', 'next_up': 'series_id'}.get(surface)
@@ -166,6 +203,7 @@ class Catalog:
         # a menu opened against an older snapshot.
         self.session.request('PUT', '/home/dismissals/' + surface + '/' + quote(str(content_id), safe=''),
                              {field: anchor}, expected_profile=self.profile_id)
+        self.invalidate()
 
     def seasons(self, series_id):
         return self._get('/catalog/series/' + quote(str(series_id), safe='') + '/seasons')['items']

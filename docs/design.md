@@ -88,7 +88,7 @@ All paths below are relative to `/api/v2` and use the selected profile's authori
 | Versions and resume menu | `GET /watch/{id}` | Use its playable versions and profile progress together; keep item ID and file ID distinct |
 | Playback track metadata | `GET /catalog/items/{id}/versions` | The independent playback owner reads trusted track inventory under its originating profile |
 
-List responses, null values, and file relationships must be checked against real authenticated fixtures before implementing the mapper. Unknown media kinds must not be presented as playable videos. Use `VideoInfoTag` and Kodi list items rather than importing metadata into Kodi's database. Server authorization remains authoritative for every detail and playback request, even if a directory entry was cached by Kodi's UI.
+List responses, null values, and file relationships must be checked against real authenticated fixtures before implementing the mapper. Unknown media kinds must not be presented as playable videos. Use `VideoInfoTag` and Kodi list items rather than importing metadata into Kodi's database. Cached detail metadata is for display; playback and personal actions obtain fresh server-authorized state.
 
 ## Playback contract
 

@@ -86,7 +86,7 @@ class HomeNavigation(unittest.TestCase):
         self.catalog.home.return_value = [{'id': key} for key in self.rows]
         self.catalog.home_section.side_effect = lambda key: self.rows[key]
         self.catalog.home_content.side_effect = lambda sections: [self.catalog.home_section(row['id']) for row in sections]
-        self.catalog.item.side_effect = lambda key: dict(self.card(key), title=key)
+        self.catalog.item.side_effect = lambda key, **kwargs: dict(self.card(key), title=key)
 
     @staticmethod
     def card(identifier):

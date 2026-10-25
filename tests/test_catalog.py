@@ -304,3 +304,64 @@ class SearchAndActions(unittest.TestCase):
                 with self.assertRaises(Error):
                     Catalog(session).home_content([{'id': 'one'}])
                 self.assertEqual(session.requests, ['/home/sections'])
+
+    def test_cached_reads_are_isolated_profile_bound_and_invalidatable(self):
+        session = Session()
+        session.responses['/home/layout'] = {'sections': [{'id': 'a'}]}
+        catalog = Catalog(session, cache_reads=True)
+        catalog.home()[0]['id'] = 'local edit'
+        self.assertEqual(catalog.home(), [{'id': 'a'}])
+        self.assertEqual(len(session.requests), 1)
+        catalog.invalidate()
+        catalog.home()
+        self.assertEqual(len(session.requests), 2)
+        session.profile = 'other'
+        with self.assertRaises(Error):
+            catalog.home()
+        self.assertEqual(len(session.requests), 2)
+
+    def test_invalidation_during_fetch_does_not_repopulate_cache(self):
+        from unittest.mock import Mock
+        session = Mock()
+        session.status.return_value = {'profile': {'id': 'viewer'}}
+        catalog = Catalog(session, cache_reads=True)
+        def fetch(*args, **kwargs):
+            catalog.invalidate()
+            return {'sections': []}
+        session.request.side_effect = fetch
+        catalog.home()
+        catalog.home()
+        self.assertEqual(session.request.call_count, 2)
+
+    def test_detail_actions_bypass_cached_metadata_and_artwork_matches_scale(self):
+        from unittest.mock import Mock
+        session = Mock()
+        session.status.return_value = {'profile': {'id': 'viewer'}}
+        session.request.return_value = {'content_id': 'a'}
+        catalog = Catalog(session, cache_reads=True)
+        catalog.artwork_scale = 2
+        catalog.item('a', fresh=False)
+        catalog.item('a', fresh=False)
+        self.assertEqual(session.request.call_count, 1)
+        catalog.item('a')
+        self.assertEqual(session.request.call_count, 2)
+        query = parse_qs(urlsplit(session.request.call_args.args[1]).query)
+        self.assertEqual(query, {'poster_width': ['560'], 'backdrop_width': ['3840'], 'still_width': ['500']})
+
+    def test_cached_reads_expire_and_watch_reads_stay_fresh(self):
+        from unittest.mock import patch
+        session = Session()
+        session.responses['/home/layout'] = {'sections': []}
+        session.responses['/watch/a'] = {'versions': []}
+        catalog = Catalog(session, cache_reads=True)
+        with patch('silo.catalog.time.monotonic', return_value=100) as clock:
+            catalog.home()
+            clock.return_value = 200
+            catalog.home()
+            self.assertEqual(session.requests, ['/home/layout'])
+            clock.return_value = 401
+            catalog.home()
+            self.assertEqual(session.requests, ['/home/layout', '/home/layout'])
+        catalog.watch('a')
+        catalog.watch('a')
+        self.assertEqual(session.requests[-2:], ['/watch/a', '/watch/a'])
