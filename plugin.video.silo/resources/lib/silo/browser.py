@@ -10,6 +10,7 @@ import xbmcgui
 import xbmcvfs
 
 from .catalog import Catalog, artwork
+from .layout import _BrowserLayout
 from .controls import active_playback, playback_options
 from .client import Error, Session
 from .ui import open_account, _text
@@ -48,8 +49,12 @@ class BrowserWindow(xbmcgui.WindowXML):
         self.worker = None
         self.pager = None
         self.publish_lock = threading.Lock()
+        self.layout = None
 
     def onInit(self):
+        if self.layout is None:
+            self.layout = _BrowserLayout(self)
+        self.layout.apply(True)
         if self.pager is None:
             self.pager = threading.Thread(target=self._page_loop, daemon=True)
             self.pager.start()
@@ -646,6 +651,10 @@ class BrowserWindow(xbmcgui.WindowXML):
             self._back()
         elif control == 300:
             self._task(self._play)
+
+    def onFocus(self, control_id):
+        if self.layout is not None:
+            self.layout.apply(control_id == 100)
 
     def onAction(self, action):
         if self.home_entry_focus is not None and self.getFocusId() == 100 and action.getId() in (1, 2, 3, 4):

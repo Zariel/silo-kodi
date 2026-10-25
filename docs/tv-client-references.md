@@ -1,6 +1,6 @@
 # TV browsing references
 
-The Kodi browser uses a 1920×1080 design canvas that Kodi scales to the configured GUI resolution. Density is a layout choice: the library and search grid has eight columns and three complete rows plus a clipped preview of the next row at either output resolution. Episode lists also show part of the next item. Home retains two complete server-defined horizontal shelves and previews the next non-empty shelf below them. The preview disappears at the end and becomes a complete shelf when navigating down. Detail text and actions use smaller type and tighter spacing.
+The Kodi browser uses a 1920×1080 design canvas that Kodi scales to the configured GUI resolution. Density is a layout choice: the library and search grid has eight columns with the compact rail (six with the expanded menu) and three complete rows plus a clipped preview of the next row at either output resolution. Episode lists also show part of the next item. Home retains two complete server-defined horizontal shelves and previews the next non-empty shelf below them. The preview disappears at the end and becomes a complete shelf when navigating down. Detail text and actions use smaller type and tighter spacing.
 
 ## Official client review
 
@@ -17,7 +17,9 @@ Home starts with the sidebar expanded. The first Up, Down, or Right enters the f
 
 Preload all Home shelves before changing the visible controls, using the aggregate sections response in layout order. Fall back to individual section reads only when necessary. Vertical navigation reuses this in-memory snapshot; returning from details, playback, or a personal action refreshes it. Bind each complete card list in one batch. Keep the old shelves visible on a slow or failed fetch, and preserve explicit sidebar navigation during loading.
 
-Keep the content canvas stationary. The expanded rail overlays the left edge instead of shifting every card, label, and button on each focus transition. Use separate native list layouts for expanded labels and the compact selection marker, with identical row heights. Icons remain part of the native list items; Kodi owns scrolling and selection. A short opacity transition emphasizes navigation focus. Icons use 128-pixel assets for scaling, with paths rooted in the add-on.
+All browser views live inside one content group. `_BrowserLayout` owns the sidebar inset, flexible control widths, and menu input bounds. The expanded sidebar reserves 360 design pixels; the compact rail reserves 120. Content coordinates are relative to that region, and resizing preserves the right margin and intrinsic poster/button sizes. Kodi reflows grid columns while horizontal shelves retain their card widths. Episode rows fit the minimum available width so their text is never clipped by a smaller container.
+
+The layout owner derives its state from window focus and publishes `sidebar_expanded` after positioning the content. XML uses that state for the menu background, labels and list layouts; it does not independently expand an overlay. Expansion shrinks and moves content before revealing the menu. Collapse hides the menu and moves content before widening controls. The compact menu's input bounds are limited to the icon rail. No fade or slide animation introduces another geometry state. Kodi owns list selection and scrolling, and the same layout policy applies to Home, sections, libraries, search, and movie/series/season details.
 
 ## Search and title actions
 
