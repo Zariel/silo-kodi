@@ -13,6 +13,10 @@ Adopt the card action vocabulary, profile-owned state, clear focus, and compact 
 
 ## Sidebar behavior
 
+Home starts with the sidebar expanded. The first Up, Down, or Right enters the first shelf and collapses the sidebar; Left keeps the sidebar available for normal menu navigation. Returning to the sidebar with Left lets Up and Down select its entries.
+
+Fetch Home shelves before changing the visible controls, then bind each complete card list in one batch. Keep the old shelves visible on a slow or failed fetch, and preserve explicit sidebar navigation during loading.
+
 Keep the content canvas stationary. The expanded rail overlays the left edge instead of shifting every card, label, and button on each focus transition. Use separate native list layouts for expanded labels and the compact selection marker, with identical row heights. Icons remain part of the native list items; Kodi owns scrolling and selection. A short opacity transition emphasizes navigation focus. Icons use 128-pixel assets for scaling, with paths rooted in the add-on.
 
 ## Search and title actions

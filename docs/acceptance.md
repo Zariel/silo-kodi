@@ -56,3 +56,9 @@ The local suite passes 130 tests. The installed package passed SHA-256 verificat
 The installed add-on opens its title menu through Kodi's synthetic held-Enter input (`Input.ButtonEvent`, keyboard map, 1000 ms). Cancel leaves playback stopped and Home unchanged. Removing a movie from Continue Watching removes it from the displayed shelf and an independent server section read; the test then undismisses it and verifies membership is restored. Favourite add/remove is verified through the independent favourites endpoint, with original state and selection restored. Both checks end with idle display protection.
 
 The automated suite passes 135 tests, including dismissal anchors, profile ownership, menu targeting, and rejection of an older in-flight page after Home membership changes. Next Up and whole-show dismissal have contract coverage but were not mutated on the user's profile. Physical remote hold behaviour still depends on its Kodi key mapping.
+
+## Home loading and sidebar focus
+
+A device trace reproduced sidebar focus in 27 of 60 samples while scrolling downward through Home shelves without Left input. Home now fetches replacement shelves before clearing controls and binds each complete list in a batch. The same check records zero sidebar jumps in 60 samples. Home starts expanded; Down enters the cards, and Left restores normal sidebar navigation.
+
+A temporary wrapper delays the first Home request by six seconds while using the installed browser and real catalog. Down during that delay enters the cards when loading completes. Subsequent sidebar navigation and Right into the cards pass. The wrapper closes normally and idle protection is verified. The automated suite passes 142 tests, covering initial directions, explicit Left, deferred focus, failed fetches, and visible shelves during refresh.

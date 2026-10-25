@@ -28,6 +28,8 @@ class BrowserWindow(xbmcgui.WindowXML):
         self.playback_history = []
         self.closed = threading.Event()
         self.busy = False
+        self.keep_sidebar_focus = False
+        self.home_entry_focus = 100
         self.worker = None
         self.pager = None
         self.publish_lock = threading.Lock()
@@ -50,6 +52,7 @@ class BrowserWindow(xbmcgui.WindowXML):
             if self.busy or self.closed.is_set():
                 return
             self.busy = True
+            self.keep_sidebar_focus = False
         self.getControl(20).setLabel('Loading…')
         def work():
             try:
@@ -79,6 +82,7 @@ class BrowserWindow(xbmcgui.WindowXML):
         if self.closed.is_set():
             return
         self._menu()
+        self.setFocusId(100)
         self._home()
 
     def _menu(self):
@@ -111,7 +115,7 @@ class BrowserWindow(xbmcgui.WindowXML):
         section = page['sections'][index]
         return self.catalog.home_section(section['id'])
 
-    def _show_home(self, page):
+    def _home_rows(self, page):
         visible = []
         index = page['offset']
         while index < len(page['sections']) and len(visible) < 2:
@@ -119,19 +123,23 @@ class BrowserWindow(xbmcgui.WindowXML):
             if row['items']:
                 visible.append((index, row))
             index += 1
+        return visible, index
+
+    def _show_home(self, page, visible, index):
         page['visible'] = visible
         page['next_row'] = index
         for slot in range(2):
             control = self.getControl(230 + slot)
-            control.reset()
             self.getControl(40 + slot).setLabel('')
             if slot >= len(visible):
+                control.reset()
                 continue
             _, row = visible[slot]
             self.getControl(40 + slot).setLabel(_text(row['title']))
-            for data in row['items']:
-                control.addItem(self._card(data))
-            control.addItem(xbmcgui.ListItem('View all'))
+            cards = [self._card(data) for data in row['items']]
+            cards.append(xbmcgui.ListItem('View all'))
+            control.reset()
+            control.addItems(cards)
             selected = page['positions'].get(row['id'])
             position = next((i for i, item in enumerate(row['items'])
                              if item['content_id'] == selected), 0)
@@ -139,8 +147,14 @@ class BrowserWindow(xbmcgui.WindowXML):
                 position = len(row['items'])
             control.selectItem(position)
         focus = page.get('focus', 230) if visible else 100
+        if visible and self.home_entry_focus is not None:
+            focus = self.home_entry_focus
+            if focus == 230:
+                self.home_entry_focus = None
         if focus == 231 and len(visible) < 2:
             focus = 230 if visible else 100
+        if self.keep_sidebar_focus:
+            focus = 100
         self.setFocusId(focus)
         self.getControl(100).controlRight(self.getControl(230 if visible else 100))
         if not visible:
@@ -176,6 +190,7 @@ class BrowserWindow(xbmcgui.WindowXML):
                         section_type=row.get('section_type')))
 
     def _library(self, library):
+        self.home_entry_focus = None
         data = self.catalog.page(library['id'])
         if self.closed.is_set():
             return
@@ -324,24 +339,31 @@ class BrowserWindow(xbmcgui.WindowXML):
     def _show(self, page):
         if self.closed.is_set():
             return
+        # Keep the current controls and focus valid while fetching Home rows.
+        # Emptying a focused shelf makes Kodi fall back to the default sidebar.
+        rows = self._home_rows(page) if page['kind'] == 'home' else None
+        if self.closed.is_set():
+            return
         profile = self.session.status()['profile']
         if profile is None or profile['id'] != self.catalog.profile_id:
             raise Error('profile_changed')
         self.page = page
         page.pop('paging_failed', None)
         kind = page['kind']
+        if kind != 'home':
+            self.home_entry_focus = None
         self.setProperty('view', kind)
         self.getControl(12).setLabel(_text(page['title']))
         self.getControl(21).setLabel('')
         self.getControl(22).setText('')
         self.getControl(30).setImage('')
         self.getControl(31).setImage('')
-        for identifier in (200, 210, 220, 230, 231):
+        for identifier in ((200, 210, 220) if kind == 'home' else (200, 210, 220, 230, 231)):
             self.getControl(identifier).reset()
         self.getControl(300).setVisible(False)
         self.getControl(301).setVisible(kind in ('item', 'season'))
         if kind == 'home':
-            self._show_home(page)
+            self._show_home(page, *rows)
             return
         if kind in ('library', 'section', 'search'):
             control_id = 200
@@ -385,6 +407,8 @@ class BrowserWindow(xbmcgui.WindowXML):
         control.selectItem(page.get('selection', 0))
         playable = kind == 'item' and page['data']['type'] in ('movie', 'episode')
         focus = page.get('focus', 300 if playable else control_id if control.size() else 301 if kind in ('item', 'season') else 100)
+        if self.keep_sidebar_focus:
+            focus = 100
         self.setFocusId(focus)
         destination = 300 if playable else control_id if control.size() else 301 if kind in ('item', 'season') else 100
         self.getControl(100).controlRight(self.getControl(destination))
@@ -543,6 +567,7 @@ class BrowserWindow(xbmcgui.WindowXML):
         if control == 100:
             index = self.getControl(100).getSelectedPosition()
             if index == 0:
+                self.home_entry_focus = 100
                 self._task(self._home)
             elif index == 1:
                 self._task(self._search)
@@ -584,6 +609,20 @@ class BrowserWindow(xbmcgui.WindowXML):
             self._task(self._play)
 
     def onAction(self, action):
+        if self.home_entry_focus is not None and self.getFocusId() == 100 and action.getId() in (1, 2, 3, 4):
+            if action.getId() == 1:
+                self.home_entry_focus = None
+                self.keep_sidebar_focus = True
+            else:
+                self.home_entry_focus = 230
+                self.keep_sidebar_focus = False
+                if not self.busy and self.page and self.page['kind'] == 'home' and self.page.get('visible'):
+                    self.getControl(100).selectItem(0)
+                    self.setFocusId(230)
+                    self.home_entry_focus = None
+            return
+        if self.busy and action.getId() in (1, 2, 3, 4) and self.getFocusId() == 100:
+            self.keep_sidebar_focus = True
         if action.getId() == 117:
             self._task(self._context)
             return

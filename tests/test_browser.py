@@ -94,6 +94,7 @@ class HomeNavigation(unittest.TestCase):
     def open_home(self):
         self.window.getControl(100).selectItem(0)
         self.window.onClick(100)
+        self.window.onAction(SimpleNamespace(getId=lambda: 2))
 
     def test_return_refreshes_rows_and_preserves_card_identity(self):
         self.open_home()
@@ -416,3 +417,81 @@ class HomeNavigation(unittest.TestCase):
             self.window.setFocusId(focus)
             self.window.onAction(SimpleNamespace(getId=lambda: 117))
         self.catalog.item.assert_not_called()
+
+    def test_home_keeps_shelves_visible_during_row_fetch(self):
+        self.open_home()
+        self.window.setFocusId(231)
+        before = [item.label for item in self.window.getControl(231).items]
+
+        def fetch(key):
+            self.assertEqual([item.label for item in self.window.getControl(231).items], before)
+            self.assertEqual(self.window.getFocusId(), 231)
+            return self.rows[key]
+
+        self.catalog.home_section.side_effect = fetch
+        self.window.page['focus'] = 231
+        self.window._show(self.window.page)
+        self.assertEqual(self.window.getFocusId(), 231)
+
+    def test_home_completion_respects_explicit_left_during_load(self):
+        def fetch(key):
+            self.window.setFocusId(100)
+            self.window.busy = True
+            self.window.onAction(SimpleNamespace(getId=lambda: 1))
+            self.window.busy = False
+            return self.rows[key]
+
+        self.catalog.home_section.side_effect = fetch
+        self.window.onClick(100)
+        self.assertEqual(self.window.getFocusId(), 100)
+        self.assertEqual(self.window.getControl(230).items[0].label, 'a')
+
+    def test_failed_home_refresh_preserves_visible_shelves(self):
+        self.open_home()
+        self.window.setFocusId(231)
+        before = [item.label for item in self.window.getControl(231).items]
+        self.catalog.home_section.side_effect = RuntimeError('offline')
+        with self.assertRaises(RuntimeError):
+            self.window._show(self.window.page)
+        self.assertEqual([item.label for item in self.window.getControl(231).items], before)
+        self.assertEqual(self.window.getFocusId(), 231)
+
+    def test_library_completion_respects_sidebar_navigation(self):
+        def fetch(*args):
+            self.window.setFocusId(100)
+            self.window.busy = True
+            self.window.onAction(SimpleNamespace(getId=lambda: 4))
+            self.window.busy = False
+            return {'items': [self.card('a')], 'next_cursor': None}
+
+        self.catalog.page.side_effect = fetch
+        self.window._library({'id': 'movies', 'name': 'Movies'})
+        self.assertEqual(self.window.getFocusId(), 100)
+        self.assertEqual(self.window.getControl(200).items[0].label, 'a')
+
+
+    def test_home_starts_expanded_and_first_direction_enters_cards(self):
+        for direction in (2, 3, 4):
+            with self.subTest(direction=direction):
+                self.window.getControl(100).selectItem(0)
+                self.window.onClick(100)
+                self.assertEqual(self.window.getFocusId(), 100)
+                self.window.onAction(SimpleNamespace(getId=lambda: direction))
+                self.assertEqual(self.window.getFocusId(), 230)
+
+    def test_left_claims_sidebar_for_normal_navigation(self):
+        self.window.onClick(100)
+        self.window.onAction(SimpleNamespace(getId=lambda: 1))
+        self.window.onAction(SimpleNamespace(getId=lambda: 4))
+        self.assertEqual(self.window.getFocusId(), 100)
+
+    def test_first_down_during_load_enters_cards_on_completion(self):
+        def fetch(key):
+            self.window.busy = True
+            self.window.onAction(SimpleNamespace(getId=lambda: 4))
+            self.window.busy = False
+            return self.rows[key]
+
+        self.catalog.home_section.side_effect = fetch
+        self.window.onClick(100)
+        self.assertEqual(self.window.getFocusId(), 230)
