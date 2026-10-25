@@ -33,3 +33,10 @@ class _BrowserLayout:
             window.setProperty('sidebar_expanded', 'true')
         for identifier, position in selections.items():
             window.getControl(identifier).selectItem(position)
+
+    def reveal(self, direction):
+        # Kodi animates the rendered group without moving its layout or focus.
+        self.window.getControl(400).setAnimations([
+            ('Conditional', 'effect=slide start=0,{} end=0,0 time=150 tween=cubic easing=out condition=true reversible=false'.format(14 * direction)),
+            ('Conditional', 'effect=fade start=80 end=100 time=120 condition=true reversible=false'),
+        ])

@@ -216,7 +216,7 @@ class BrowserWindow(xbmcgui.WindowXML):
             elif page['next_row'] < len(page['sections']):
                 page['offset'] = visible[-1][0]
                 page['focus'] = 231
-                self._show(page, refresh=False)
+                self._show(page, refresh=False, motion=direction)
         elif slot == 1:
             self.setFocusId(230)
         elif visible and visible[0][0] > 0:
@@ -225,7 +225,7 @@ class BrowserWindow(xbmcgui.WindowXML):
                 index -= 1
             page['offset'] = index
             page['focus'] = 230
-            self._show(page, refresh=False)
+            self._show(page, refresh=False, motion=direction)
         else:
             self.setFocusId(100)
 
@@ -386,7 +386,7 @@ class BrowserWindow(xbmcgui.WindowXML):
         item.setProperty('meta', _text(' · '.join(meta)))
         return item
 
-    def _show(self, page, refresh=True):
+    def _show(self, page, refresh=True, motion=None):
         if self.closed.is_set():
             return
         # Keep the current controls and focus valid while fetching Home rows.
@@ -397,6 +397,8 @@ class BrowserWindow(xbmcgui.WindowXML):
         profile = self.session.status()['profile']
         if profile is None or profile['id'] != self.catalog.profile_id:
             raise Error('profile_changed')
+        if motion is None:
+            motion = 1 if page is not self.page else 0
         self.page = page
         page.pop('paging_failed', None)
         kind = page['kind']
@@ -421,6 +423,8 @@ class BrowserWindow(xbmcgui.WindowXML):
         self.getControl(303).setLabel('Show' if kind == 'season' else 'Season')
         if kind == 'home':
             self._show_home(page, *rows)
+            if self.layout is not None and motion:
+                self.layout.reveal(motion)
             return
         self._warm_artwork(page.get('items', []))
         if kind in ('library', 'section', 'search'):
@@ -480,6 +484,8 @@ class BrowserWindow(xbmcgui.WindowXML):
                 button.controlDown(control if control.size() else button)
             if control.size():
                 control.controlUp(self.getControl(actions[0]))
+        if self.layout is not None and motion:
+            self.layout.reveal(motion)
 
     def _detail(self, content_id):
         data = self.catalog.item(content_id, fresh=False)
@@ -642,7 +648,7 @@ class BrowserWindow(xbmcgui.WindowXML):
             self._task(self._video)
         elif self.history:
             page = self.history.pop()
-            self._task(lambda: self._show(page))
+            self._task(lambda: self._show(page, motion=-1))
         else:
             self.close()
 
