@@ -1,0 +1,36 @@
+msgid ""
+msgstr ""
+"Language: en_GB\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgctxt "#32000"
+msgid "Playback"
+msgstr ""
+
+msgctxt "#32001"
+msgid "Automatically play the next episode"
+msgstr ""
+
+msgctxt "#32002"
+msgid "Play next after (seconds)"
+msgstr ""
+
+msgctxt "#32003"
+msgid "Automatically skip intros"
+msgstr ""
+
+msgctxt "#32004"
+msgid "Playback preferences for this Kodi installation. Saved across restarts and shared by your Silo profiles."
+msgstr ""
+
+msgctxt "#32005"
+msgid "After an episode finishes, show a countdown before starting the next episode. Back cancels the countdown."
+msgstr ""
+
+msgctxt "#32006"
+msgid "Wait between 1 and 60 seconds before playing the next episode."
+msgstr ""
+
+msgctxt "#32007"
+msgid "Skip intros when Silo supplies timing for the selected file. Changes apply to the next video you start."
+msgstr ""

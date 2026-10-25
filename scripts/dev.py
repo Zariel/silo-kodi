@@ -36,7 +36,9 @@ def check():
 
 def package_files():
     files = [ADDON / name for name in ("addon.xml", "addon.py", "auth.py", "LICENSE.txt", "THIRD_PARTY.md")]
-    for directory, extensions in (("resources/lib", {".py"}), ("resources/skins", {".xml", ".png"})):
+    files.append(ADDON / 'resources/settings.xml')
+    for directory, extensions in (("resources/lib", {".py"}), ("resources/skins", {".xml", ".png"}),
+                                  ("resources/language", {".po"})):
         files.extend(path for path in (ADDON / directory).rglob("*")
                      if path.is_file() and path.suffix in extensions and "__pycache__" not in path.parts)
     files.append(ADDON / "resources/lib/segno/LICENSE")

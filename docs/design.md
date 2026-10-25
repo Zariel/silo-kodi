@@ -56,9 +56,13 @@ Episode cards and season lists render Silo's explicit watched state or a percent
 
 Resolve the next playable episode from the current season's episode list in numeric order, then the next regular season. Do not loop from regular seasons into specials. Omit entries with no readable files. The details action stops only the owned episode and waits for its playback lock to be released before launching the next item through the normal version and resume flow.
 
-After natural completion and successful session cleanup, the playback owner publishes a short-lived, profile-scoped completion event. The active browser consumes it once and offers Play next or Back to browsing. There is no countdown or autoplay. A new playback owner clears stale completion events.
+After natural completion and successful session cleanup, the playback owner publishes a short-lived, profile-scoped completion event. The active browser consumes it once and offers Play next or Back to browsing. A new playback owner clears stale completion events. Stop does not publish completion.
+
+Kodi owns persistence and the configuration window through `resources/settings.xml`. Preferences belong to this Kodi installation, rather than the Silo profile or catalog. Both automatic actions default to off. When autoplay is enabled, the browser presents a cancellable countdown of 1–60 seconds, beginning when the dialog opens. Cancellation wins over a later timeout. Recheck browser lifetime, profile identity, and native playback before starting the next item. Autoplay uses the first server-offered version and normal server resume semantics without interactive version or resume questions. Manual Play retains those choices.
 
 Use the selected file's `intro` marker from the existing versions response. Accept only finite bounds inside the native player's duration and a source-aligned timeline. A playback-owned Kodi dialog offers Skip intro only during that interval; selecting it requests a native seek after rechecking the interval. Dismissal suppresses the prompt for that playback attempt. Missing or invalid markers produce no prompt, and the client never estimates intro timing.
+
+Read the automatic intro preference when starting a playback attempt. In automatic mode, seek once when the valid interval is reached in unpaused fullscreen playback without another dialog. Record the interval as handled before seeking so seeking backwards does not trigger a loop. Browsing, pause, missing markers, and shifted timelines never trigger automatic seeks.
 
 ### Initial TV layouts
 

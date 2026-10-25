@@ -69,16 +69,19 @@ class HomeNavigation(unittest.TestCase):
         modules['silo.controls'].active_playback.return_value = None
         modules['silo.controls'].take_completed.return_value = None
         modules['xbmcaddon'].Addon.return_value.getAddonInfo.return_value = '/addon'
-        modules['xbmcgui'] = SimpleNamespace(WindowXML=Window, ListItem=lambda label: Mock(label=label), getCurrentWindowId=lambda: 13000)
+        modules['xbmcgui'] = SimpleNamespace(WindowXML=Window, ListItem=lambda label: Mock(label=label),
+                                            getCurrentWindowId=lambda: 13000, getCurrentWindowDialogId=lambda: 9999)
         modules['silo.ui'] = SimpleNamespace(open_account=Mock(), _text=str)
         path = Path(__file__).resolve().parents[1] / 'plugin.video.silo/resources/lib/silo/browser.py'
         with patch.dict(sys.modules, modules):
             spec = importlib.util.spec_from_file_location('silo.browser_test', path)
             browser = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(browser)
+        browser.autoplay_delay = Mock(return_value=None)
         session = Mock(server='https://silo.example.test')
         session.status.return_value = {'profile': {'id': 'viewer', 'name': 'Viewer'}}
         self.window = browser.BrowserWindow(session=session)
+        self.window.window_id = 13000
         self.window._task = lambda operation: operation()
         self.catalog = Mock(profile_id='viewer')
         self.catalog.next_episode.return_value = None
@@ -128,6 +131,23 @@ class HomeNavigation(unittest.TestCase):
         with self.assertRaises(globals_['Error']):
             self.window._play_next()
         player.stop.assert_not_called()
+
+    def test_autoplay_preserves_resume_without_interactive_choices(self):
+        globals_ = self.window._play.__globals__
+        player = globals_['xbmc'].Player.return_value
+        player.isPlaying.return_value = False
+        self.window._remember = Mock()
+        self.catalog.watch.return_value = {'versions': [{'file_id': 'preferred'}, {'file_id': 'alternate'}],
+                                          'user_data': {'position_seconds': 120, 'played': False}}
+        dialog = Mock()
+        with patch.object(globals_['xbmcgui'], 'Dialog', return_value=dialog, create=True):
+            self.window._play(self.card('next'), prompt=False)
+        dialog.select.assert_not_called()
+        dialog.contextmenu.assert_not_called()
+        query = parse_qs(urlsplit(player.play.call_args.args[0]).query)
+        self.assertEqual(query['file'], ['preferred'])
+        self.assertEqual(query['content'], ['next'])
+        self.assertNotIn('restart', query)
 
     def open_home(self):
         self.window.getControl(100).selectItem(0)
@@ -324,7 +344,7 @@ class HomeNavigation(unittest.TestCase):
         globals_['xbmc'].getCondVisibility.return_value = True
         self.window._menu()
         self.assertEqual([item.label for item in self.window.getControl(100).items],
-                         ['Home', 'Search', 'Resume playback', 'Account', 'Close'])
+                         ['Home', 'Search', 'Resume playback', 'Account', 'Settings', 'Close'])
         self.window.getControl(100).selectItem(2)
         self.window.setFocusId(100)
         self.window.onClick(100)
@@ -347,7 +367,7 @@ class HomeNavigation(unittest.TestCase):
         self.window.onClick(100)
         globals_['xbmc'].executebuiltin.assert_not_called()
         self.assertEqual([item.label for item in self.window.getControl(100).items],
-                         ['Home', 'Search', 'Account', 'Close'])
+                         ['Home', 'Search', 'Account', 'Settings', 'Close'])
 
     def test_context_play_keeps_launch_page(self):
         control = self.library()
@@ -477,7 +497,7 @@ class HomeNavigation(unittest.TestCase):
 
     def test_menu_keeps_playback_choices_without_sidebar_entry(self):
         self.window._menu()
-        self.assertEqual([item.label for item in self.window.getControl(100).items], ['Home', 'Search', 'Account', 'Close'])
+        self.assertEqual([item.label for item in self.window.getControl(100).items], ['Home', 'Search', 'Account', 'Settings', 'Close'])
         globals_ = self.window.onClick.__globals__
         globals_['active_playback'].return_value = {'content_id': 'movie'}
         self.window.onAction(SimpleNamespace(getId=lambda: 117))

@@ -13,6 +13,7 @@ import xbmcvfs
 from .catalog import Catalog, artwork
 from .layout import _BrowserLayout
 from .details import detail_labels, watch_status
+from .settings import autoplay_delay
 from .artwork import _ArtworkPreloader
 from .controls import active_playback, playback_options, take_completed
 from .client import Error, Session
@@ -144,6 +145,7 @@ class BrowserWindow(xbmcgui.WindowXML):
             self.resume_index = len(self.libraries) + 2
             add('Resume playback', 'resume')
         add('Account', 'account')
+        add('Settings', 'settings')
         add('Close', 'close')
         if previous_resume is None and self.resume_index is not None and selection >= self.resume_index:
             selection += 1
@@ -589,7 +591,8 @@ class BrowserWindow(xbmcgui.WindowXML):
             try:
                 if not self.busy:
                     self._sync_bar()
-                    if xbmcgui.getCurrentWindowId() == self.window_id:
+                    if (xbmcgui.getCurrentWindowId() == self.window_id
+                            and xbmcgui.getCurrentWindowDialogId() <= 9999):
                         completed = take_completed(self.catalog.profile_id)
                         if completed:
                             self._task(lambda content_id=completed: self._offer_next(content_id))
@@ -606,9 +609,25 @@ class BrowserWindow(xbmcgui.WindowXML):
             return
         label = 'S{} E{} · {}'.format(following.get('season_number', ''), following['episode_number'],
                                      following.get('title') or 'Episode')
-        if xbmcgui.Dialog().yesno('Next episode', _text(label), nolabel='Back to browsing', yeslabel='Play next'):
+
+        def valid():
+            profile = self.session.status().get('profile') or {}
+            return (not self.closed.is_set() and profile.get('id') == self.catalog.profile_id
+                    and xbmcgui.getCurrentWindowId() == self.window_id
+                    and not xbmc.Player().isPlaying())
+
+        delay = autoplay_delay()
+        if delay is None:
+            accepted = xbmcgui.Dialog().yesno('Next episode', _text(label), nolabel='Back to browsing', yeslabel='Play next')
+        else:
+            from .next_episode import confirm_next
+            accepted = confirm_next(_text(label), delay, valid)
+        if accepted and valid():
             self._detail(following['content_id'])
-            self._play()
+            if delay is None:
+                self._play()
+            else:
+                self._play(prompt=False)
 
     def _sync_bar(self):
         state = active_playback(self.catalog.profile_id)
@@ -717,7 +736,7 @@ class BrowserWindow(xbmcgui.WindowXML):
             if page['kind'] != 'home' and target['items']:
                 self.getControl(100).controlRight(control)
 
-    def _play(self, data=None):
+    def _play(self, data=None, prompt=True):
         data = data if data is not None else self.page['data']
         playing = active_playback(self.catalog.profile_id)
         if playing and playing.get('content_id') == data['content_id']:
@@ -730,7 +749,7 @@ class BrowserWindow(xbmcgui.WindowXML):
         if not versions:
             raise Error('unsupported_playback')
         index = 0
-        if len(versions) > 1:
+        if len(versions) > 1 and prompt:
             labels = [' · '.join(str(version.get(key) or '') for key in ('resolution', 'codec_video', 'codec_audio', 'container')) for version in versions]
             index = xbmcgui.Dialog().select('Choose version', labels)
         if index < 0 or self.closed.is_set():
@@ -738,7 +757,7 @@ class BrowserWindow(xbmcgui.WindowXML):
         progress = watch.get('user_data') or {}
         position = progress.get('position_seconds') or 0
         restart = False
-        if position > 0 and not progress.get('played'):
+        if position > 0 and not progress.get('played') and prompt:
             if self.closed.is_set():
                 return
             seconds = int(position)
@@ -798,6 +817,8 @@ class BrowserWindow(xbmcgui.WindowXML):
             elif index == len(self.libraries) + 2 + int(self.resume_index is not None):
                 self.account_requested = True
                 self.close()
+            elif index == len(self.libraries) + 3 + int(self.resume_index is not None):
+                self._task(lambda: xbmcaddon.Addon('plugin.video.silo').openSettings())
             else:
                 self.close()
         elif control in (230, 231):

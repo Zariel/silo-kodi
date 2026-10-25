@@ -6,9 +6,10 @@ from .markers import intro_at
 
 
 class SkipIntro(xbmcgui.WindowXMLDialog):
-    def __init__(self, *args, segment, **kwargs):
+    def __init__(self, *args, segment, automatic=False, **kwargs):
         super().__init__(*args, **kwargs)
         self.segment = segment
+        self.automatic = automatic
         self.current = None
         self.requested = None
         self.dismissed = set()
@@ -22,6 +23,14 @@ class SkipIntro(xbmcgui.WindowXMLDialog):
             return requested[1]
         self.current = current
         fullscreen = xbmcgui.getCurrentWindowId() == 12005
+        if self.automatic:
+            self.close()
+            if (current and current not in self.dismissed and fullscreen
+                    and xbmcgui.getCurrentWindowDialogId() <= 9999
+                    and not xbmc.getCondVisibility('Player.Paused')):
+                self.dismissed.add(current)
+                return current[1]
+            return None
         if not current or current in self.dismissed or not fullscreen:
             self.close()
         elif not self.visible and xbmcgui.getCurrentWindowDialogId() <= 9999:
