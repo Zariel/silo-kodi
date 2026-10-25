@@ -27,7 +27,7 @@
         <control type="label"><left>10</left><top>254</top><width>188</width><height>25</height><font>font10</font><textcolor>FFD0D0DA</textcolor><label>$INFO[ListItem.Property(meta)]</label></control>
       </focusedlayout>
     </control>
-    <control type="fixedlist" id="210"><left>380</left><top>505</top><width>1340</width><height>440</height><orientation>horizontal</orientation><focusposition>0</focusposition>
+    <control type="list" id="210"><left>380</left><top>505</top><width>1340</width><height>440</height><orientation>horizontal</orientation>
       <onleft>100</onleft><onright>210</onright><onup>301</onup><ondown>301</ondown>
       <visible>String.IsEqual(Window.Property(view),item)</visible>
       <itemlayout width="240" height="430">
