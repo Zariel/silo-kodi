@@ -276,6 +276,44 @@ class HomeNavigation(unittest.TestCase):
         self.assertFalse(self.window.closed.is_set())
         self.assertEqual(control.position, 12)
 
+    def test_browser_return_pauses_only_running_silo_video(self):
+        self.library()
+        self.window.layout = Mock()
+        self.window.artwork = Mock()
+        self.window.pager = Mock()
+        globals_ = self.window.onInit.__globals__
+        player = globals_['xbmc'].Player.return_value
+        for active, paused, expected in ((True, False, 1), (True, True, 0), (False, False, 0)):
+            with self.subTest(active=active, paused=paused):
+                player.pause.reset_mock()
+                globals_['active_playback'].return_value = {'content_id': '0'} if active else None
+                globals_['xbmc'].getCondVisibility.return_value = paused
+                with patch.object(globals_['xbmcgui'], 'getScreenWidth', return_value=1920, create=True):
+                    self.window.onInit()
+                self.assertEqual(player.pause.call_count, expected)
+
+    def test_episode_parent_navigation_from_direct_entry(self):
+        episode = dict(self.card('episode'), type='episode', series_id='show', season_number=0)
+        series = dict(self.card('show'), type='series')
+        self.catalog.item.side_effect = lambda key, **kwargs: dict(episode if key == 'episode' else series)
+        self.catalog.episodes.return_value = [dict(episode, content_id='other', episode_number=1),
+                                              dict(episode, episode_number=2)]
+        self.catalog.seasons.return_value = [{'season_number': 0}]
+        self.window._detail('episode')
+        self.window.setFocusId(303)
+        self.window.onClick(303)
+        self.assertEqual(self.window.page['kind'], 'season')
+        self.assertEqual(self.window.page['title'], 'show · Specials')
+        self.assertEqual(self.window.getControl(220).position, 1)
+        self.catalog.episodes.assert_called_once_with('show', 0)
+
+        self.window.setFocusId(303)
+        self.window.onClick(303)
+        self.assertEqual(self.window.page['data']['content_id'], 'show')
+        self.window._back()
+        self.assertEqual(self.window.page['kind'], 'season')
+        self.assertEqual(self.window.getControl(220).position, 1)
+
     def test_browsing_during_playback_keeps_detail_back_navigation(self):
         self.library()
         origin = self.window.page

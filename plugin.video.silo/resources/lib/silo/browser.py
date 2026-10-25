@@ -55,6 +55,10 @@ class BrowserWindow(xbmcgui.WindowXML):
         self.artwork = None
 
     def onInit(self):
+        # Kodi reinitializes this window when Back leaves fullscreen video.
+        # Pause before restoring the catalog so browsing cannot advance playback.
+        if active_playback(self.catalog.profile_id) and not xbmc.getCondVisibility('Player.Paused'):
+            xbmc.Player().pause()
         if self.artwork is None:
             self.artwork = _ArtworkPreloader()
         self.catalog.artwork_scale = max(1, xbmcgui.getScreenWidth() / 1920)
@@ -410,6 +414,11 @@ class BrowserWindow(xbmcgui.WindowXML):
         self.getControl(300).setVisible(False)
         self.getControl(301).setVisible(kind in ('item', 'season'))
         self.getControl(302).setVisible(kind == 'item')
+        parent = kind == 'season' or (kind == 'item' and page['data'].get('type') == 'episode'
+                                     and page['data'].get('series_id')
+                                     and page['data'].get('season_number') is not None)
+        self.getControl(303).setVisible(bool(parent))
+        self.getControl(303).setLabel('Show' if kind == 'season' else 'Season')
         if kind == 'home':
             self._show_home(page, *rows)
             return
@@ -453,23 +462,24 @@ class BrowserWindow(xbmcgui.WindowXML):
         control = self.getControl(control_id)
         control.selectItem(page.get('selection', 0))
         playable = kind == 'item' and page['data']['type'] in ('movie', 'episode')
-        self.getControl(302).setPosition(324 if playable else 64, 490)
-        self.getControl(301).setPosition(584 if playable else 324 if kind == 'item' else 64, 490)
         focus = page.get('focus', 300 if playable else control_id if control.size() else 301 if kind in ('item', 'season') else 100)
         if self.keep_sidebar_focus:
             focus = 100
         self.setFocusId(focus)
         destination = 300 if playable else control_id if control.size() else 301 if kind in ('item', 'season') else 100
         self.getControl(100).controlRight(self.getControl(destination))
-        self.getControl(301).controlRight(self.getControl(control_id if control.size() else 100))
-        self.getControl(301).controlUp(self.getControl(control_id if control.size() else 100))
-        self.getControl(301).controlDown(self.getControl(control_id if control.size() else 100))
-        self.getControl(302).controlLeft(self.getControl(300 if playable else 100))
-        self.getControl(302).controlDown(self.getControl(control_id if control.size() else 301))
-        self.getControl(301).controlLeft(self.getControl(302 if kind == 'item' else 100))
-        if playable:
-            self.getControl(301).controlUp(self.getControl(300))
-            self.getControl(300).controlRight(self.getControl(302))
+        if kind in ('item', 'season'):
+            actions = ([300] if playable else []) + ([302] if kind == 'item' else [])
+            actions += ([303] if parent else []) + [301]
+            for index, identifier in enumerate(actions):
+                button = self.getControl(identifier)
+                button.setPosition(64 + index * 260, 490)
+                button.controlLeft(self.getControl(actions[index - 1] if index else 100))
+                button.controlRight(self.getControl(actions[index + 1] if index + 1 < len(actions) else identifier))
+                button.controlUp(self.getControl(100))
+                button.controlDown(control if control.size() else button)
+            if control.size():
+                control.controlUp(self.getControl(actions[0]))
 
     def _detail(self, content_id):
         data = self.catalog.item(content_id, fresh=False)
@@ -478,12 +488,21 @@ class BrowserWindow(xbmcgui.WindowXML):
         seasons = self.catalog.seasons(content_id) if data['type'] == 'series' else []
         self._push({'kind': 'item', 'title': data.get('title') or 'Untitled', 'data': data, 'items': seasons})
 
-    def _season(self, season):
-        series = self.page['data']
+    def _season(self, season, series=None, episode_id=None):
+        series = series if series is not None else self.page['data']
         episodes = self.catalog.episodes(series['content_id'], season['season_number'])
         data = dict(series, poster_url=season.get('poster_url') or series.get('poster_url'))
         title = '{} · {}'.format(series['title'], 'Specials' if season['season_number'] == 0 else 'Season {}'.format(season['season_number']))
-        self._push({'kind': 'season', 'title': title, 'data': data, 'items': episodes})
+        selection = next((i for i, item in enumerate(episodes) if item['content_id'] == episode_id), 0)
+        self._push({'kind': 'season', 'title': title, 'data': data, 'items': episodes, 'selection': selection})
+
+    def _parent(self):
+        data = self.page['data']
+        if self.page['kind'] == 'season':
+            self._detail(data['content_id'])
+        elif data.get('type') == 'episode' and data.get('series_id') and data.get('season_number') is not None:
+            series = self.catalog.item(data['series_id'], fresh=False)
+            self._season({'season_number': data['season_number']}, series, data['content_id'])
 
     def _page_loop(self):
         while not self.closed.wait(.15):
@@ -675,6 +694,8 @@ class BrowserWindow(xbmcgui.WindowXML):
             self._task(self._play)
         elif control == 302:
             self._task(self._context)
+        elif control == 303:
+            self._task(self._parent)
 
     def onFocus(self, control_id):
         if self.layout is not None:
