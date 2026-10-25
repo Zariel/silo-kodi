@@ -40,3 +40,12 @@ class _BrowserLayout:
             ('Conditional', 'effect=slide start=0,{} end=0,0 time=150 tween=cubic easing=out condition=true reversible=false'.format(14 * direction)),
             ('Conditional', 'effect=fade start=80 end=100 time=120 condition=true reversible=false'),
         ])
+
+    def playback(self, visible):
+        # Keep fully focused rows above the overlay; the bottom preview may fade beneath it.
+        for identifier, height in ((200, 885), (220, 405)):
+            control = self.window.getControl(identifier)
+            selection = control.getSelectedPosition() if control.size() else None
+            control.setHeight(height - 80 if visible else height)
+            if selection is not None:
+                control.selectItem(selection)

@@ -12,7 +12,7 @@
     <control type="textbox" id="22"><left>64</left><top>230</top><width>1660</width><height>150</height><font>font27</font><textcolor>FFE8E8EC</textcolor></control>
 
     <control type="panel" id="200"><scrolltime tween="cubic" easing="out">150</scrolltime><preloaditems>2</preloaditems><left>56</left><top>125</top><width>1664</width><height>885</height><orientation>vertical</orientation>
-      <onleft>100</onleft><onright>200</onright><onup>200</onup><ondown>200</ondown>
+      <onleft>100</onleft><onright>200</onright><onup>200</onup><ondown>500</ondown>
       <visible>String.IsEqual(Window.Property(view),library) | String.IsEqual(Window.Property(view),section) | String.IsEqual(Window.Property(view),search)</visible>
       <itemlayout width="208" height="280">
         <control type="image"><left>10</left><top>5</top><width>150</width><height>225</height><texture border="16" colordiffuse="FF24242C">rounded.png</texture></control>
@@ -29,7 +29,7 @@
       </focusedlayout>
     </control>
     
-    <control type="list" id="210"><scrolltime tween="cubic" easing="out">150</scrolltime><left>56</left><top>605</top><width>1664</width><height>345</height><orientation>horizontal</orientation><onleft>100</onleft><onright>210</onright><onup>302</onup><ondown>301</ondown><visible>String.IsEqual(Window.Property(view),item)</visible>
+    <control type="list" id="210"><scrolltime tween="cubic" easing="out">150</scrolltime><left>56</left><top>605</top><width>1664</width><height>345</height><orientation>horizontal</orientation><onleft>100</onleft><onright>210</onright><onup>302</onup><ondown>500</ondown><visible>String.IsEqual(Window.Property(view),item)</visible>
       <itemlayout width="208" height="345">
         <control type="image"><left>10</left><top>8</top><width>185</width><height>250</height><texture border="16" colordiffuse="FF24242C">rounded.png</texture></control>
         <control type="image"><left>10</left><top>8</top><width>185</width><height>250</height><texture diffuse="card-185x250.png">$INFO[ListItem.Art(poster)]</texture><aspectratio scalediffuse="false">scale</aspectratio></control>
@@ -45,7 +45,7 @@
       </focusedlayout>
     </control>
     
-    <control type="list" id="220"><scrolltime tween="cubic" easing="out">150</scrolltime><left>56</left><top>605</top><width>1664</width><height>405</height><onleft>100</onleft><onright>220</onright><onup>301</onup><ondown>301</ondown><visible>String.IsEqual(Window.Property(view),season)</visible>
+    <control type="list" id="220"><scrolltime tween="cubic" easing="out">150</scrolltime><left>56</left><top>605</top><width>1664</width><height>405</height><onleft>100</onleft><onright>220</onright><onup>301</onup><ondown>500</ondown><visible>String.IsEqual(Window.Property(view),season)</visible>
       <itemlayout width="1424" height="125">
         <control type="image"><left>10</left><top>5</top><width>200</width><height>112</height><texture border="16" colordiffuse="FF24242C">rounded.png</texture></control>
         <control type="image"><left>10</left><top>5</top><width>200</width><height>112</height><texture diffuse="card-250x140.png">$INFO[ListItem.Art(poster)]</texture><aspectratio scalediffuse="false">scale</aspectratio></control>
@@ -61,7 +61,7 @@
         <control type="textbox"><left>235</left><top>48</top><width>1150</width><height>65</height><font>font23_narrow</font><textcolor>FFE8E8EC</textcolor><label>$INFO[ListItem.Property(summary)]</label></control>
       </focusedlayout>
     </control>
-    <control type="button" id="300"><left>64</left><top>490</top><width>240</width><height>55</height><font>font27</font><label>Play</label><textcolor>FF141417</textcolor><disabledcolor>FF777780</disabledcolor><focusedcolor>FF141417</focusedcolor><texturefocus border="16" colordiffuse="FFFFFFFF">rounded.png</texturefocus><texturenofocus border="16" colordiffuse="$INFO[Window.Property(accent)]">rounded.png</texturenofocus><onleft>100</onleft><onright>210</onright><onup>301</onup><ondown>301</ondown></control>
+    <control type="button" id="300"><left>64</left><top>490</top><width>240</width><height>55</height><font>font27</font><label>Play</label><textcolor>FF141417</textcolor><disabledcolor>FF777780</disabledcolor><focusedcolor>FF141417</focusedcolor><texturefocus border="16" colordiffuse="FFFFFFFF">rounded.png</texturefocus><texturenofocus border="16" colordiffuse="$INFO[Window.Property(accent)]">rounded.png</texturenofocus><onleft>100</onleft><onright>210</onright><onup>301</onup><ondown>500</ondown></control>
     <control type="button" id="301"><left>584</left><top>490</top><width>180</width><height>55</height><font>font27</font><label>Back</label><textcolor>FFE8E8EC</textcolor><focusedcolor>FF141417</focusedcolor><texturefocus border="16" colordiffuse="FFFFFFFF">rounded.png</texturefocus><texturenofocus border="16" colordiffuse="FF303038">rounded.png</texturenofocus><onleft>302</onleft><onright>210</onright><onup>300</onup><ondown>220</ondown></control>
     <control type="label" id="24"><left>64</left><top>555</top><width>1660</width><height>40</height><font>font23_narrow</font><textcolor>FFE8E8EC</textcolor><scroll>true</scroll></control>
     <control type="label" id="25"><left>64</left><top>185</top><width>1660</width><height>40</height><font>font23_narrow</font><textcolor>FFC4A7F2</textcolor><scroll>true</scroll></control>
@@ -123,7 +123,7 @@
         <control type="label"><left>10</left><top>300</top><width>185</width><height>38</height><font>font23_narrow</font><textcolor>FFA4A4AE</textcolor><label>$INFO[ListItem.Property(meta)]</label></control>
       </focusedlayout>
     </control>
-    <control type="label" id="23"><left>64</left><top>1045</top><width>1500</width><height>30</height><font>font10</font><textcolor>FFA4A4AE</textcolor><label>Hold Select / Menu: title options · Resume playback: sidebar</label><visible>Player.HasVideo + !String.IsEmpty(Window(Home).Property(silo.playback.state))</visible></control>
+    <control type="label" id="23"><left>64</left><top>1045</top><width>1500</width><height>30</height><font>font10</font><textcolor>FFA4A4AE</textcolor><label>Hold Select / Menu: title options · Resume playback: sidebar</label><visible>false</visible></control>
     </control>
     <control type="group">
       <control type="image"><left>0</left><top>0</top><width>120</width><height>1080</height><texture colordiffuse="FF151519">white.png</texture></control>
@@ -133,7 +133,7 @@
     <control type="label" id="11"><visible>String.IsEqual(Window.Property(sidebar_expanded),true)</visible><left>32</left><top>135</top><width>300</width><height>45</height><font>font23_narrow</font><textcolor>FFA4A4AE</textcolor></control>
     <control type="list" id="100">
       <left>24</left><top>220</top><width>315</width><height>720</height>
-      <onleft>100</onleft><onright>200</onright><onup>100</onup><ondown>100</ondown>
+      <onleft>100</onleft><onright>200</onright><onup>100</onup><ondown>500</ondown>
       <itemlayout width="315" height="72" condition="String.IsEqual(Window.Property(sidebar_expanded),true)">
         <control type="label"><left>70</left><top>0</top><width>235</width><height>65</height><font>font27</font><textcolor>FFC4C4CE</textcolor><label>$INFO[ListItem.Label]</label></control>
       <control type="image"><left>17</left><top>15</top><width>36</width><height>36</height><texture>$INFO[ListItem.Property(nav_icon)]</texture><colordiffuse>FFE8E8EC</colordiffuse></control>
@@ -154,6 +154,20 @@
       </focusedlayout>
     <scrolltime>0</scrolltime></control>
 
+    </control>
+    <control type="group" id="490">
+      <visible>Player.HasVideo + String.IsEqual(Window.Property(playback_bar),true)</visible>
+      <control type="image"><left>0</left><top>924</top><width>1920</width><height>36</height><texture>playback-fade.png</texture></control>
+      <control type="image"><left>0</left><top>960</top><width>1920</width><height>120</height><texture colordiffuse="FF18181E">white.png</texture></control>
+      <control type="progress" id="491"><left>0</left><top>960</top><width>1920</width><height>3</height><texturebg colordiffuse="FF393940">white.png</texturebg><midtexture colordiffuse="$INFO[Window.Property(accent)]">white.png</midtexture><lefttexture /><righttexture /><overlaytexture /><info>Player.Progress</info></control>
+      <control type="label" id="492"><left>36</left><top>979</top><width>840</width><height>38</height><font>font27</font><textcolor>FFFFFFFF</textcolor><label>$INFO[Window.Property(playback_title)]</label><scroll>true</scroll></control>
+      <control type="label"><left>36</left><top>1025</top><width>840</width><height>30</height><font>font23_narrow</font><textcolor>FFB4B4BE</textcolor><label>$INFO[Player.Time] / $INFO[Player.Duration] · $INFO[Player.Progress]%  ·  Up / Back to browse</label></control>
+      <control type="button" id="500"><left>916</left><top>991</top><width>140</width><height>58</height><font>font23_narrow</font><align>center</align><label>Play</label><textcolor>FFE8E8EC</textcolor><focusedcolor>FF141417</focusedcolor><texturefocus border="16" colordiffuse="$INFO[Window.Property(accent)]">rounded.png</texturefocus><texturenofocus border="16" colordiffuse="FF303038">rounded.png</texturenofocus><onleft>500</onleft><onright>501</onright><onup>500</onup><ondown>100</ondown></control>
+      <control type="button" id="501"><left>1068</left><top>991</top><width>120</width><height>58</height><font>font23_narrow</font><align>center</align><label>−10s</label><textcolor>FFE8E8EC</textcolor><focusedcolor>FF141417</focusedcolor><texturefocus border="16" colordiffuse="$INFO[Window.Property(accent)]">rounded.png</texturefocus><texturenofocus border="16" colordiffuse="FF303038">rounded.png</texturenofocus><onleft>500</onleft><onright>502</onright><onup>501</onup><ondown>100</ondown></control>
+      <control type="button" id="502"><left>1200</left><top>991</top><width>120</width><height>58</height><font>font23_narrow</font><align>center</align><label>+30s</label><textcolor>FFE8E8EC</textcolor><focusedcolor>FF141417</focusedcolor><texturefocus border="16" colordiffuse="$INFO[Window.Property(accent)]">rounded.png</texturefocus><texturenofocus border="16" colordiffuse="FF303038">rounded.png</texturenofocus><onleft>501</onleft><onright>503</onright><onup>502</onup><ondown>100</ondown></control>
+      <control type="button" id="503"><left>1332</left><top>991</top><width>180</width><height>58</height><font>font23_narrow</font><align>center</align><label>Fullscreen</label><textcolor>FFE8E8EC</textcolor><focusedcolor>FF141417</focusedcolor><texturefocus border="16" colordiffuse="$INFO[Window.Property(accent)]">rounded.png</texturefocus><texturenofocus border="16" colordiffuse="FF303038">rounded.png</texturenofocus><onleft>502</onleft><onright>504</onright><onup>503</onup><ondown>100</ondown></control>
+      <control type="button" id="504"><left>1524</left><top>991</top><width>140</width><height>58</height><font>font23_narrow</font><align>center</align><label>Options</label><textcolor>FFE8E8EC</textcolor><focusedcolor>FF141417</focusedcolor><texturefocus border="16" colordiffuse="$INFO[Window.Property(accent)]">rounded.png</texturefocus><texturenofocus border="16" colordiffuse="FF303038">rounded.png</texturenofocus><onleft>503</onleft><onright>505</onright><onup>504</onup><ondown>100</ondown></control>
+      <control type="button" id="505"><left>1676</left><top>991</top><width>120</width><height>58</height><font>font23_narrow</font><align>center</align><label>Stop</label><textcolor>FFE8E8EC</textcolor><focusedcolor>FF141417</focusedcolor><texturefocus border="16" colordiffuse="$INFO[Window.Property(accent)]">rounded.png</texturefocus><texturenofocus border="16" colordiffuse="FF303038">rounded.png</texturenofocus><onleft>504</onleft><onright>505</onright><onup>505</onup><ondown>100</ondown></control>
     </control>
   </controls>
 </window>

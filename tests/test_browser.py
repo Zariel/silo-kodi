@@ -337,6 +337,62 @@ class HomeNavigation(unittest.TestCase):
         self.window.onAction(SimpleNamespace(getId=lambda: 92))
         self.assertFalse(self.window.closed.is_set())
 
+    def test_bar_actions_require_owned_playback(self):
+        self.library()
+        globals_ = self.window.onClick.__globals__
+        player = globals_['xbmc'].Player.return_value
+        for identifier in range(500, 506):
+            self.window.onClick(identifier)
+        player.pause.assert_not_called()
+        player.stop.assert_not_called()
+        player.seekTime.assert_not_called()
+        globals_['xbmc'].executebuiltin.assert_not_called()
+
+    def test_bar_seek_respects_media_bounds(self):
+        self.library()
+        globals_ = self.window.onClick.__globals__
+        globals_['active_playback'].return_value = {'content_id': 'current'}
+        player = globals_['xbmc'].Player.return_value
+        player.getTotalTime.return_value = 100
+        player.getTime.return_value = 4
+        self.window.onClick(501)
+        player.seekTime.assert_called_with(0)
+        player.getTime.return_value = 90
+        self.window.onClick(502)
+        player.seekTime.assert_called_with(99)
+
+    def test_bar_back_restores_focus_without_popping_history(self):
+        self.library()
+        self.window.onClick(200)
+        detail = self.window.page
+        self.window.onFocus(300)
+        self.window.setFocusId(500)
+        self.window.onAction(SimpleNamespace(getId=lambda: 92))
+        self.assertEqual(self.window.getFocusId(), 300)
+        self.assertIs(self.window.page, detail)
+        self.assertEqual(len(self.window.history), 1)
+
+    def test_bar_return_focus_survives_page_restoration(self):
+        for home in (False, True):
+            with self.subTest(home=home):
+                if home:
+                    self.open_home()
+                    origin_focus = 230
+                else:
+                    self.library()
+                    self.window.onClick(200)
+                    origin_focus = 300
+                page = self.window.page
+                self.window.onFocus(origin_focus)
+                self.window.setFocusId(503)
+                self.window.onClick.__globals__['active_playback'].return_value = {'content_id': 'playing'}
+                self.window.onClick(503)
+                self.window.onFocus(100)
+                self.window._show(page, refresh=False)
+                self.window.onAction(SimpleNamespace(getId=lambda: 92))
+                self.assertEqual(self.window.getFocusId(), origin_focus)
+                self.assertIs(self.window.page, page)
+
     def test_browser_return_pauses_only_running_silo_video(self):
         self.library()
         self.window.layout = Mock()

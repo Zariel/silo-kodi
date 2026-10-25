@@ -12,6 +12,7 @@ class Control:
         self.x = float(element.findtext('left', '0'))
         self.y = float(element.findtext('top', '0'))
         self.width = float(element.findtext('width', '0'))
+        self.height = float(element.findtext('height', '0'))
         self.count = 0
         self.selection = 0
 
@@ -29,6 +30,10 @@ class Control:
 
     def setWidth(self, width):
         self.width = width
+        self.selection = 0
+
+    def setHeight(self, height):
+        self.height = height
         self.selection = 0
 
     def setPosition(self, x, y):
@@ -49,6 +54,23 @@ class Window:
 
 
 class BrowserLayout(unittest.TestCase):
+    def test_playback_overlay_leaves_room_and_preserves_selection(self):
+        path = Path(__file__).resolve().parents[1] / 'plugin.video.silo/resources/skins/Default/1080i/Browser.xml'
+        window = Window(ET.parse(path).getroot())
+        layout = _BrowserLayout(window)
+        for identifier in (200, 220):
+            window.getControl(identifier).count = 40
+            window.getControl(identifier).selection = 24
+        layout.playback(True)
+        for identifier in (200, 220):
+            control = window.getControl(identifier)
+            self.assertLessEqual(control.y + control.height, 960)
+            self.assertEqual(control.selection, 24)
+        layout.playback(False)
+        self.assertEqual(window.getControl(200).height, 885)
+        self.assertEqual(window.getControl(220).height, 405)
+        self.assertEqual(window.getControl(220).selection, 24)
+
     def test_content_fits_beside_sidebar_in_both_states(self):
         path = Path(__file__).resolve().parents[1] / 'plugin.video.silo/resources/skins/Default/1080i/Browser.xml'
         root = ET.parse(path).getroot()

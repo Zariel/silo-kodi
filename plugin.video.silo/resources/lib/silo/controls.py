@@ -18,10 +18,11 @@ def _read(window, key):
 
 
 class PlaybackControls:
-    def __init__(self, profile_id=None, content_id=None):
+    def __init__(self, profile_id=None, content_id=None, title=None):
         self.window = xbmcgui.Window(10000)
         self.profile_id = profile_id
         self.content_id = content_id
+        self.title = title
         self.state = {}
         self.window.clearProperty(_STATE)
         self.window.clearProperty(_REQUEST)
@@ -42,6 +43,7 @@ class PlaybackControls:
         # Publish only UI metadata, never stream URLs, headers, or credentials.
         self.state = {'revision': str(uuid.uuid4()), 'tracks': tracks,
                       'profile_id': self.profile_id, 'content_id': self.content_id,
+                      'title': self.title,
                       'qualities': [entry['label'] for entry in plan.get('available_qualities', [])],
                       'quality': quality,
                       'selected': subtitle.get('track_id') if subtitle.get('mode') != 'off' else None}

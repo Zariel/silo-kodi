@@ -43,6 +43,8 @@ class BrowserWindow(xbmcgui.WindowXML):
         self.page = None
         self.account_requested = False
         self.resume_index = None
+        self.bar_visible = None
+        self.browse_focus = 100
         self.closed = threading.Event()
         self.busy = False
         self.keep_sidebar_focus = False
@@ -64,6 +66,8 @@ class BrowserWindow(xbmcgui.WindowXML):
         if self.layout is None:
             self.layout = _BrowserLayout(self)
         self.layout.apply(True)
+        self.bar_visible = None
+        self._sync_bar()
         if self.pager is None:
             self.pager = threading.Thread(target=self._page_loop, daemon=True)
             self.pager.start()
@@ -210,7 +214,7 @@ class BrowserWindow(xbmcgui.WindowXML):
             focus = 230 if visible else 100
         if self.keep_sidebar_focus:
             focus = 100
-        self.setFocusId(focus)
+        self._restore_focus(page, focus)
         self.getControl(100).controlRight(self.getControl(230 if visible else 100))
         if not visible:
             self.getControl(21).setLabel('No titles on Home. Browse a library from the menu.')
@@ -227,6 +231,8 @@ class BrowserWindow(xbmcgui.WindowXML):
                 page['offset'] = visible[-1][0]
                 page['focus'] = 231
                 self._show(page, refresh=False, motion=direction)
+            elif self.bar_visible:
+                self.setFocusId(500)
         elif slot == 1:
             self.setFocusId(230)
         elif visible and visible[0][0] > 0:
@@ -358,6 +364,8 @@ class BrowserWindow(xbmcgui.WindowXML):
     def _remember(self):
         if self.page:
             self.page['focus'] = self.getFocusId()
+            if self.getFocusId() in range(500, 506):
+                self.page['bar_return_focus'] = self.browse_focus
             if self.page['kind'] == 'home':
                 for slot, (_, row) in enumerate(self.page.get('visible', [])):
                     position = self.getControl(230 + slot).getSelectedPosition()
@@ -366,6 +374,11 @@ class BrowserWindow(xbmcgui.WindowXML):
                 return
             control = {'library': 200, 'section': 200, 'search': 200, 'item': 210, 'season': 220}[self.page['kind']]
             self.page['selection'] = max(0, self.getControl(control).getSelectedPosition())
+
+    def _restore_focus(self, page, focus):
+        self.setFocusId(focus)
+        if focus in range(500, 506):
+            self.browse_focus = page.get('bar_return_focus', 100)
 
     def _push(self, page):
         if self.closed.is_set():
@@ -479,7 +492,7 @@ class BrowserWindow(xbmcgui.WindowXML):
         focus = page.get('focus', 300 if playable else control_id if control.size() else 301 if kind in ('item', 'season') else 100)
         if self.keep_sidebar_focus:
             focus = 100
-        self.setFocusId(focus)
+        self._restore_focus(page, focus)
         destination = 300 if playable else control_id if control.size() else 301 if kind in ('item', 'season') else 100
         self.getControl(100).controlRight(self.getControl(destination))
         if kind in ('item', 'season'):
@@ -491,7 +504,7 @@ class BrowserWindow(xbmcgui.WindowXML):
                 button.controlLeft(self.getControl(actions[index - 1] if index else 100))
                 button.controlRight(self.getControl(actions[index + 1] if index + 1 < len(actions) else identifier))
                 button.controlUp(self.getControl(100))
-                button.controlDown(control if control.size() else button)
+                button.controlDown(control if control.size() else self.getControl(500) if self.bar_visible else button)
             if control.size():
                 control.controlUp(self.getControl(actions[0]))
         if self.layout is not None and motion:
@@ -524,11 +537,50 @@ class BrowserWindow(xbmcgui.WindowXML):
         while not self.closed.wait(.15):
             page = self.page
             try:
+                if not self.busy:
+                    self._sync_bar()
                 self._prefetch()
             except Exception:
                 if page is not None:
                     page['paging_failed'] = True
                 xbmc.log('Silo: background paging failed', xbmc.LOGERROR)
+
+    def _sync_bar(self):
+        state = active_playback(self.catalog.profile_id)
+        visible = bool(state)
+        self.setProperty('playback_bar', str(visible).lower())
+        if state:
+            self.setProperty('playback_title', _text(state.get('title') or 'Silo video'))
+            self.getControl(500).setLabel('Play' if xbmc.getCondVisibility('Player.Paused') else 'Pause')
+        if self.layout is not None and visible != self.bar_visible:
+            self.layout.playback(visible)
+        self.bar_visible = visible
+        if not visible and self.page and self.page.get('focus') in range(500, 506):
+            self.page['focus'] = self.browse_focus
+        if not visible and self.getFocusId() in range(500, 506):
+            self.setFocusId(self.browse_focus)
+
+    def _bar_action(self, control):
+        if not active_playback(self.catalog.profile_id):
+            self._sync_bar()
+            return
+        player = xbmc.Player()
+        try:
+            if control == 500:
+                player.pause()
+            elif control in (501, 502):
+                position = max(0, player.getTime() + (-10 if control == 501 else 30))
+                player.seekTime(min(position, max(0, player.getTotalTime() - 1)))
+            elif control == 503:
+                self._video()
+            elif control == 504:
+                playback_options()
+            elif control == 505:
+                player.stop()
+                self.setFocusId(self.browse_focus)
+        except RuntimeError:
+            # The native player can finish between the ownership check and an action.
+            self._sync_bar()
 
     def _paging_current(self, page, target, control_id):
         if self.closed.is_set() or self.busy or self.page is not page:
@@ -632,9 +684,12 @@ class BrowserWindow(xbmcgui.WindowXML):
             restart = choice == 1
         if self.closed.is_set():
             return
+        title = data.get('title') or 'Silo'
+        if data.get('series_title') and data.get('season_number') is not None and data.get('episode_number') is not None:
+            title = '{} · S{} E{} · {}'.format(data['series_title'], data['season_number'], data['episode_number'], title)
         query = {'action': 'play', 'profile': self.catalog.profile_id,
                  'content': data['content_id'],
-                 'file': versions[index]['file_id'], 'title': data.get('title') or 'Silo'}
+                 'file': versions[index]['file_id'], 'title': title}
         if restart:
             query['restart'] = 'true'
         self._remember()
@@ -660,6 +715,9 @@ class BrowserWindow(xbmcgui.WindowXML):
 
     def onClick(self, control):
         if self.busy:
+            return
+        if control in range(500, 506):
+            self._task(lambda: self._bar_action(control))
             return
         if control == 100:
             index = self.getControl(100).getSelectedPosition()
@@ -712,12 +770,17 @@ class BrowserWindow(xbmcgui.WindowXML):
             self._task(self._parent)
 
     def onFocus(self, control_id):
+        if control_id not in range(500, 506):
+            self.browse_focus = control_id
         if control_id == 100 and bool(active_playback(self.catalog.profile_id)) != (self.resume_index is not None):
             self._menu()
         if self.layout is not None:
             self.layout.apply(control_id == 100)
 
     def onAction(self, action):
+        if self.getFocusId() in range(500, 506) and action.getId() in (3, 9, 10, 92):
+            self.setFocusId(self.browse_focus)
+            return
         if self.home_entry_focus is not None and self.getFocusId() == 100 and action.getId() in (1, 2, 3, 4):
             if action.getId() == 1:
                 self.home_entry_focus = None

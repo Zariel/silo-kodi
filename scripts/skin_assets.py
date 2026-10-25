@@ -43,6 +43,13 @@ def detail_fade():
     return png(180, 108, pixels)
 
 
+def playback_fade():
+    pixels = bytearray()
+    for y in range(36):
+        pixels.extend((0, 24, 24, 30, round(255 * (y / 35) ** 2)))
+    return png(1, 36, pixels)
+
+
 def icon(segments, circles=()):
     pixels = bytearray()
     for y in range(128):
@@ -84,6 +91,7 @@ def navigation_icons():
 if __name__ == '__main__':
     OUTPUT.mkdir(parents=True, exist_ok=True)
     (OUTPUT / 'details-fade.png').write_bytes(detail_fade())
+    (OUTPUT / 'playback-fade.png').write_bytes(playback_fade())
     navigation_icons()
     (OUTPUT / 'nav-accent.png').write_bytes(rounded(4, 32, 2))
     (OUTPUT / 'rounded.png').write_bytes(rounded(64, 64, 16))

@@ -44,6 +44,8 @@ Choose **Play** on a movie or episode. If Silo has saved your progress, you can 
 
 Press **Back** during playback to pause and return to the page you launched it from. Further Back presses follow your browsing history, restoring selection and scroll position. Choose **Resume playback** in the sidebar, or **Resume** on the playing title, to continue watching. Home and library shortcuts start a fresh browsing history.
 
+While video is playing or paused, a bottom playback bar shows its title, time and progress. Move Down from the bottom of a list or the sidebar to use Play/Pause, skip back 10 seconds, skip forward 30 seconds, Fullscreen, Options or Stop. Up or Back returns to your previous browsing control.
+
 While browsing during playback, open the context menu and choose **Playback options**:
 
 - **Quality:** choose from the qualities offered by Silo, or **Auto** to let Silo choose. Changing quality preserves your position and pause state.
