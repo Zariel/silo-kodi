@@ -123,7 +123,7 @@
         <control type="label"><left>10</left><top>300</top><width>185</width><height>38</height><font>font23_narrow</font><textcolor>FFA4A4AE</textcolor><label>$INFO[ListItem.Property(meta)]</label></control>
       </focusedlayout>
     </control>
-    <control type="label" id="23"><left>64</left><top>1045</top><width>1500</width><height>30</height><font>font10</font><textcolor>FFA4A4AE</textcolor><label>Hold Select / Menu: title options · Back: return to video</label><visible>Player.HasVideo + !String.IsEmpty(Window(Home).Property(silo.playback.state))</visible></control>
+    <control type="label" id="23"><left>64</left><top>1045</top><width>1500</width><height>30</height><font>font10</font><textcolor>FFA4A4AE</textcolor><label>Hold Select / Menu: title options · Resume playback: sidebar</label><visible>Player.HasVideo + !String.IsEmpty(Window(Home).Property(silo.playback.state))</visible></control>
     </control>
     <control type="group">
       <control type="image"><left>0</left><top>0</top><width>120</width><height>1080</height><texture colordiffuse="FF151519">white.png</texture></control>

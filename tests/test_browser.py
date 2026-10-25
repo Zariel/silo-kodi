@@ -59,6 +59,9 @@ class Window:
     def setProperty(self, *args):
         pass
 
+    def close(self):
+        pass
+
 
 class HomeNavigation(unittest.TestCase):
     def setUp(self):
@@ -259,7 +262,7 @@ class HomeNavigation(unittest.TestCase):
         self.window._prefetch()
         self.assertEqual([item.label for item in self.window.getControl(200).items], ['first', 'second'])
 
-    def test_playback_returns_to_origin_and_back_reopens_video(self):
+    def test_playback_preserves_detail_and_back_pops_history(self):
         control = self.library()
         control.selectItem(12)
         self.window.onClick(200)
@@ -267,14 +270,72 @@ class HomeNavigation(unittest.TestCase):
         globals_ = self.window.onClick.__globals__
         globals_['xbmc'].Player.return_value.isPlaying.return_value = False
         self.window.onClick(300)
-        self.assertEqual(self.window.page['kind'], 'library')
-        self.assertEqual(control.position, 12)
+        self.assertEqual(self.window.page['kind'], 'item')
+        self.assertEqual(self.window.page['data']['content_id'], '12')
 
         globals_['active_playback'].return_value = {'content_id': '12'}
         self.window.onAction(SimpleNamespace(getId=lambda: 92))
-        globals_['xbmc'].executebuiltin.assert_called_once_with('ActivateWindow(fullscreenvideo)')
+        globals_['xbmc'].executebuiltin.assert_not_called()
+        self.assertEqual(self.window.page['kind'], 'library')
         self.assertFalse(self.window.closed.is_set())
         self.assertEqual(control.position, 12)
+
+    def test_sidebar_resume_preserves_browsing_history(self):
+        self.library()
+        origin = self.window.page
+        self.window.onClick(200)
+        detail = self.window.page
+        globals_ = self.window.onClick.__globals__
+        globals_['active_playback'].return_value = {'content_id': 'other'}
+        globals_['xbmc'].getCondVisibility.return_value = True
+        self.window._menu()
+        self.assertEqual([item.label for item in self.window.getControl(100).items],
+                         ['Home', 'Search', 'Resume playback', 'Account', 'Close'])
+        self.window.getControl(100).selectItem(2)
+        self.window.setFocusId(100)
+        self.window.onClick(100)
+        self.assertIs(self.window.page, detail)
+        self.assertEqual(self.window.history, [origin])
+        globals_['xbmc'].Player.return_value.pause.assert_called_once()
+        globals_['xbmc'].executebuiltin.assert_called_once_with('ActivateWindow(fullscreenvideo)')
+        self.window._back()
+        self.assertIs(self.window.page, origin)
+        self.window._back()
+        self.assertTrue(self.window.closed.is_set())
+
+    def test_expired_resume_does_not_reopen_player(self):
+        self.library()
+        globals_ = self.window.onClick.__globals__
+        globals_['active_playback'].return_value = {'content_id': 'other'}
+        self.window._menu()
+        self.window.getControl(100).selectItem(2)
+        globals_['active_playback'].return_value = None
+        self.window.onClick(100)
+        globals_['xbmc'].executebuiltin.assert_not_called()
+        self.assertEqual([item.label for item in self.window.getControl(100).items],
+                         ['Home', 'Search', 'Account', 'Close'])
+
+    def test_context_play_keeps_launch_page(self):
+        control = self.library()
+        control.selectItem(7)
+        origin = self.window.page
+        self.catalog.watch.return_value = {'versions': [{'file_id': 'file'}], 'user_data': {}}
+        globals_ = self.window.onClick.__globals__
+        globals_['xbmc'].Player.return_value.isPlaying.return_value = False
+        dialog = Mock()
+        dialog.contextmenu.return_value = 0
+        with patch.object(globals_['xbmcgui'], 'Dialog', return_value=dialog, create=True):
+            self.window.onAction(SimpleNamespace(getId=lambda: 117))
+        self.assertIs(self.window.page, origin)
+        self.assertEqual(self.window.history, [])
+        self.assertEqual(control.position, 7)
+        globals_['xbmc'].Player.return_value.play.assert_called_once()
+
+    def test_back_during_restore_does_not_close_browser(self):
+        self.library()
+        self.window.busy = True
+        self.window.onAction(SimpleNamespace(getId=lambda: 92))
+        self.assertFalse(self.window.closed.is_set())
 
     def test_browser_return_pauses_only_running_silo_video(self):
         self.library()
@@ -317,7 +378,6 @@ class HomeNavigation(unittest.TestCase):
     def test_browsing_during_playback_keeps_detail_back_navigation(self):
         self.library()
         origin = self.window.page
-        self.window.playback_page = origin
         self.window.onClick(200)
         globals_ = self.window.onClick.__globals__
         globals_['active_playback'].return_value = {'content_id': 'other'}

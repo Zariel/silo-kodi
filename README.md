@@ -42,7 +42,7 @@ Marking a TV show watched or unwatched applies to all its episodes. Removing an 
 
 Choose **Play** on a movie or episode. If Silo has saved your progress, you can resume or start from the beginning. Use Kodi's playback controls to pause, seek, and select an audio track.
 
-Press **Back** during playback to browse the collection you started from, with the playing title selected. Press **Back** again from that collection to return to fullscreen video.
+Press **Back** during playback to pause and return to the page you launched it from. Further Back presses follow your browsing history, restoring selection and scroll position. Choose **Resume playback** in the sidebar, or **Resume** on the playing title, to continue watching. Home and library shortcuts start a fresh browsing history.
 
 While browsing during playback, open the context menu and choose **Playback options**:
 
