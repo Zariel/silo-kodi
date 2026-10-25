@@ -84,6 +84,7 @@ if __name__ == '__main__':
     OUTPUT.mkdir(parents=True, exist_ok=True)
     (OUTPUT / 'details-fade.png').write_bytes(detail_fade())
     navigation_icons()
+    (OUTPUT / 'nav-accent.png').write_bytes(rounded(4, 32, 2))
     (OUTPUT / 'rounded.png').write_bytes(rounded(64, 64, 16))
     for width, height in ((150, 225), (185, 250), (215, 310), (250, 140), (280, 420)):
         (OUTPUT / f'card-{width}x{height}.png').write_bytes(rounded(width, height, 12))
