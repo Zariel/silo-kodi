@@ -67,8 +67,9 @@ class HomeNavigation(unittest.TestCase):
     def setUp(self):
         modules = {name: Mock() for name in ('xbmc', 'xbmcaddon', 'xbmcvfs', 'silo.controls')}
         modules['silo.controls'].active_playback.return_value = None
+        modules['silo.controls'].take_completed.return_value = None
         modules['xbmcaddon'].Addon.return_value.getAddonInfo.return_value = '/addon'
-        modules['xbmcgui'] = SimpleNamespace(WindowXML=Window, ListItem=lambda label: Mock(label=label))
+        modules['xbmcgui'] = SimpleNamespace(WindowXML=Window, ListItem=lambda label: Mock(label=label), getCurrentWindowId=lambda: 13000)
         modules['silo.ui'] = SimpleNamespace(open_account=Mock(), _text=str)
         path = Path(__file__).resolve().parents[1] / 'plugin.video.silo/resources/lib/silo/browser.py'
         with patch.dict(sys.modules, modules):
@@ -80,6 +81,7 @@ class HomeNavigation(unittest.TestCase):
         self.window = browser.BrowserWindow(session=session)
         self.window._task = lambda operation: operation()
         self.catalog = Mock(profile_id='viewer')
+        self.catalog.next_episode.return_value = None
         self.window.catalog = self.catalog
         self.rows = {
             'first': {'id': 'first', 'title': 'First', 'items': [self.card('a'), self.card('b')]},
@@ -94,6 +96,38 @@ class HomeNavigation(unittest.TestCase):
     @staticmethod
     def card(identifier):
         return {'content_id': identifier, 'type': 'movie', 'title': identifier}
+
+    def test_season_episode_without_type_displays_progress(self):
+        card = self.window._card({'content_id': 'episode', 'episode_number': 1,
+                                  'user_data': {'position_seconds': 90, 'duration_seconds': 360}})
+        card.setProperty.assert_any_call('watch_status', '25% watched')
+
+    def test_completion_requires_explicit_choice(self):
+        globals_ = self.window._offer_next.__globals__
+        globals_['xbmc'].Player.return_value.isPlaying.return_value = False
+        self.catalog.next_episode.return_value = {'content_id': 'next', 'season_number': 1,
+                                                 'episode_number': 2, 'title': 'Next'}
+        self.window._detail = Mock()
+        self.window._play = Mock()
+        dialog = Mock()
+        with patch.object(globals_['xbmcgui'], 'Dialog', return_value=dialog, create=True):
+            dialog.yesno.return_value = False
+            self.window._offer_next('episode')
+            self.window._play.assert_not_called()
+            dialog.yesno.return_value = True
+            self.window._offer_next('episode')
+        self.window._detail.assert_called_once_with('next')
+        self.window._play.assert_called_once_with()
+
+    def test_play_next_cannot_stop_another_video(self):
+        globals_ = self.window._play_next.__globals__
+        self.window.page = {'data': {'content_id': 'episode'}, 'next_episode': {'content_id': 'next'}}
+        player = globals_['xbmc'].Player.return_value
+        player.isPlaying.return_value = True
+        globals_['active_playback'].return_value = {'content_id': 'another'}
+        with self.assertRaises(globals_['Error']):
+            self.window._play_next()
+        player.stop.assert_not_called()
 
     def open_home(self):
         self.window.getControl(100).selectItem(0)

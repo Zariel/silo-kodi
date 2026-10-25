@@ -306,6 +306,9 @@ def play(handle, session, profile_id, file_id, title, start_position=None, sourc
                             xbmc.log('Silo: closing playback session', xbmc.LOGINFO)
                             attempt.stop(last_position, paused)
                             xbmc.log('Silo: playback session closed', xbmc.LOGINFO)
+                            if controls and player.completed and duration and pending_url is None:
+                                # Publish before releasing ownership; a subsequent start clears this event.
+                                controls.complete()
                         except Error:
                             xbmc.log('Silo: could not confirm playback cleanup; server expiry will reclaim the session', xbmc.LOGWARNING)
     except Error as exc:

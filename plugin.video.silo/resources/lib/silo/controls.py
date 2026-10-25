@@ -1,12 +1,14 @@
 """Small Kodi window-property channel between browsing and the playback owner."""
 import json
 import uuid
+import time
 
 import xbmc
 import xbmcgui
 
 _STATE = 'silo.playback.state'
 _REQUEST = 'silo.playback.request'
+_COMPLETED = 'silo.playback.completed'
 
 
 def _read(window, key):
@@ -26,6 +28,7 @@ class PlaybackControls:
         self.state = {}
         self.window.clearProperty(_STATE)
         self.window.clearProperty(_REQUEST)
+        self.window.clearProperty(_COMPLETED)
 
     def publish(self, plan, quality='auto', native_subtitles=False):
         subtitle = plan.get('subtitle') or {}
@@ -71,6 +74,21 @@ class PlaybackControls:
     def close(self):
         self.window.clearProperty(_STATE)
         self.window.clearProperty(_REQUEST)
+
+    def complete(self):
+        self.window.setProperty(_COMPLETED, json.dumps({'profile_id': self.profile_id,
+                                'content_id': self.content_id, 'time': time.time()}))
+
+
+def take_completed(profile_id):
+    window = xbmcgui.Window(10000)
+    event = _read(window, _COMPLETED)
+    if event.get('profile_id') != profile_id:
+        return None
+    window.clearProperty(_COMPLETED)
+    if event.get('content_id') and 0 <= time.time() - event.get('time', 0) < 60:
+        return event['content_id']
+    return None
 
 
 def active_playback(profile_id):

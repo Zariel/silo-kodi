@@ -15,7 +15,7 @@ class Lifetime(unittest.TestCase):
                                 subtitles=[], relay_updated=False, item_properties={}, position=20,
                                 paused=scenario.startswith('quality') or scenario == 'hls_subtitle',
                                 done=False, samples=[], opens=[], audio_index=1, audio_selections=[],
-                                subtitle_index=None, subtitle_enabled=False, subtitle_selections=[])
+                                subtitle_index=None, subtitle_enabled=False, subtitle_selections=[], completions=[])
         url = 'https://silo.example.test/api/v2/stream/owned'
 
         class Player:
@@ -106,6 +106,11 @@ class Lifetime(unittest.TestCase):
 
             def sample(self, *args):
                 state.samples.append(args)
+                if scenario in ('natural_end', 'remote_stop'):
+                    if scenario == 'natural_end':
+                        state.player.onPlayBackEnded()
+                    else:
+                        state.player.onPlayBackStopped()
                 if state.opens or scenario == 'hls_subtitle':
                     state.done = True
                     state.reported_audio = state.audio_index
@@ -171,6 +176,7 @@ class Lifetime(unittest.TestCase):
         with patch.dict(sys.modules, modules):
             spec.loader.exec_module(module)
             controls = Mock()
+            controls.complete.side_effect = lambda: state.completions.append((state.closed, state.final_sample))
             controls.take.return_value = {'subtitle': 'track'} if scenario == 'replan_replacement' else None
             if scenario.startswith('quality'):
                 controls.take.side_effect = [{'quality': '360p'}, None]
@@ -200,6 +206,13 @@ class Lifetime(unittest.TestCase):
                 session = SimpleNamespace(store=SimpleNamespace(playback_lock=nullcontext))
                 module.play(1, session, 'profile', 'file', 'Title', source=source)
         return state
+
+    def test_only_natural_end_offers_next_after_final_progress(self):
+        completed = self.run_playback('natural_end')
+        self.assertEqual(completed.completions, [(True, (600, False))])
+        stopped = self.run_playback('remote_stop')
+        self.assertEqual(stopped.completions, [])
+        self.assertEqual(stopped.final_sample, (20, False))
 
     def test_quality_reopen_restores_observed_audio_before_reporting(self):
         state = self.run_playback('quality_audio')

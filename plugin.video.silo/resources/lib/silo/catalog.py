@@ -214,3 +214,23 @@ class Catalog:
 
     def watch(self, content_id):
         return self._get('/watch/' + quote(str(content_id), safe=''))
+
+    def next_episode(self, episode):
+        series = episode.get('series_id')
+        season, number = episode.get('season_number'), episode.get('episode_number')
+        if episode.get('type') != 'episode' or not series or type(season) is not int or type(number) is not int:
+            return None
+
+        def available(items):
+            return [item for item in items if type(item.get('episode_number')) is int
+                    and ('files' not in item or any(not file.get('unreadable') for file in item['files']))]
+
+        candidates = [item for item in available(self.episodes(series, season)) if item['episode_number'] > number]
+        if not candidates:
+            seasons = [item['season_number'] for item in self.seasons(series)
+                       if type(item.get('season_number')) is int and item['season_number'] > season
+                       and item['season_number'] > 0]
+            if not seasons:
+                return None
+            candidates = available(self.episodes(series, min(seasons)))
+        return min(candidates, key=lambda item: item['episode_number']) if candidates else None

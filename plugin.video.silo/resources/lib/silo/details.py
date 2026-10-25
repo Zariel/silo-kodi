@@ -1,4 +1,5 @@
 """Display facts supplied by Silo; never infer playback capability from badges."""
+import math
 
 
 def detail_labels(data, items, season=False):
@@ -51,3 +52,16 @@ def detail_labels(data, items, season=False):
         'credits': '  ·  '.join(people),
         'format': '  •  '.join(list(production[:2]) + technical),
     }
+
+
+def watch_status(data):
+    progress = data.get('user_data') or {}
+    state = data.get('user_state') or {}
+    if state.get('played', progress.get('played')) is True:
+        return '✓ Watched'
+    position = progress.get('position_seconds', data.get('position_seconds'))
+    duration = progress.get('duration_seconds', data.get('duration_seconds'))
+    if (type(position) in (int, float) and type(duration) in (int, float)
+            and math.isfinite(position) and math.isfinite(duration) and 0 < position < duration):
+        return '{}% watched'.format(max(1, min(99, int(position * 100 / duration))))
+    return ''

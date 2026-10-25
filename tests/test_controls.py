@@ -92,6 +92,23 @@ class Controls(unittest.TestCase):
         self.owner.close()
         self.assertEqual(self.properties, {})
 
+    def test_completion_is_profile_bound_and_consumed_once(self):
+        owner = self.module.PlaybackControls('viewer', 'episode')
+        owner.complete()
+        self.assertIsNone(self.module.take_completed('other'))
+        self.assertEqual(self.module.take_completed('viewer'), 'episode')
+        self.assertIsNone(self.module.take_completed('viewer'))
+
+    def test_completion_expires_and_new_playback_clears_it(self):
+        owner = self.module.PlaybackControls('viewer', 'episode')
+        with patch.object(self.module.time, 'time', return_value=100):
+            owner.complete()
+        with patch.object(self.module.time, 'time', return_value=161):
+            self.assertIsNone(self.module.take_completed('viewer'))
+        owner.complete()
+        self.module.PlaybackControls('viewer', 'another')
+        self.assertIsNone(self.module.take_completed('viewer'))
+
     def test_playback_navigation_is_bound_to_profile_and_lifetime(self):
         self.owner = self.module.PlaybackControls('viewer', 'movie')
         self.owner.publish(self.plan)

@@ -50,6 +50,14 @@ Prototype an add-on-owned poster grid and detail screen through `xbmcgui.WindowX
 
 Limit the first interface to server connection/device sign-in, a profile picker with PIN entry, a library selector and paginated poster grid, title details with Play/Resume and version choice, and season/episode selection. Include profile switching in a consistent location. Keep Kodi's normal playback OSD for pause, seek, audio, and subtitle selection. Continue Watching can follow once server resume is reliable; do not reproduce the web dashboard in the first milestone.
 
+### Episode progression
+
+Episode cards and season lists render Silo's explicit watched state or a percentage from its saved position and duration. Do not infer completion from a percentage or persist a second watch-state store. Refresh catalog data after playback before rendering restored details or season lists.
+
+Resolve the next playable episode from the current season's episode list in numeric order, then the next regular season. Do not loop from regular seasons into specials. Omit entries with no readable files. The details action stops only the owned episode and waits for its playback lock to be released before launching the next item through the normal version and resume flow.
+
+After natural completion and successful session cleanup, the playback owner publishes a short-lived, profile-scoped completion event. The active browser consumes it once and offers Play next or Back to browsing. There is no countdown or autoplay. A new playback owner clears stale completion events.
+
 ### Initial TV layouts
 
 - **Browse:** a narrow left navigation rail with library names and profile access, followed by a spacious poster grid. Begin with approximately six posters across the content area at 1080p and adjust after viewing on a TV. Show the title and secondary metadata below each poster. Keep badges legible and limited to useful source-format information; they describe the file, not verified output capability.

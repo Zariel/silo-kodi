@@ -3,10 +3,18 @@ import sys
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'plugin.video.silo/resources/lib'))
-from silo.details import detail_labels
+from silo.details import detail_labels, watch_status
 
 
 class Details(unittest.TestCase):
+    def test_episode_watch_status_is_server_owned(self):
+        self.assertEqual(watch_status({'user_data': {'played': True}}), '✓ Watched')
+        self.assertEqual(watch_status({'user_data': {'position_seconds': 125, 'duration_seconds': 500}}), '25% watched')
+        self.assertEqual(watch_status({'position_seconds': 99, 'duration_seconds': 100}), '99% watched')
+        for data in ({}, {'position_seconds': 30}, {'position_seconds': 100, 'duration_seconds': 100},
+                     {'position_seconds': 1, 'duration_seconds': float('inf')}):
+            self.assertEqual(watch_status(data), '')
+
     def test_series_facts_and_people(self):
         labels = detail_labels({
             'type': 'series', 'year': 2020, 'content_rating': 'TV-14',

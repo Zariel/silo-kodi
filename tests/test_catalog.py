@@ -32,6 +32,34 @@ class Session:
 
 
 class Browsing(unittest.TestCase):
+    def test_next_episode_uses_numeric_order_and_crosses_seasons(self):
+        session = Session()
+        session.responses.update({
+            '/catalog/series/show/seasons/1/episodes': {'items': [
+                {'content_id': 'later', 'episode_number': 10}, {'content_id': 'next', 'episode_number': 3}]},
+            '/catalog/series/show/seasons': {'items': [{'season_number': 0}, {'season_number': 3}, {'season_number': 2}]},
+            '/catalog/series/show/seasons/2/episodes': {'items': [
+                {'content_id': 'second', 'episode_number': 2}, {'content_id': 'first', 'episode_number': 1}]},
+        })
+        catalog = Catalog(session)
+        episode = {'type': 'episode', 'series_id': 'show', 'season_number': 1, 'episode_number': 2}
+        self.assertEqual(catalog.next_episode(episode)['content_id'], 'next')
+        episode['episode_number'] = 10
+        self.assertEqual(catalog.next_episode(episode)['content_id'], 'first')
+        session.responses['/catalog/series/show/seasons']['items'] = [{'season_number': 0}, {'season_number': 1}]
+        self.assertIsNone(catalog.next_episode(episode))
+        self.assertIsNone(catalog.next_episode({'type': 'movie'}))
+
+    def test_next_episode_skips_missing_or_unreadable_files(self):
+        session = Session()
+        session.responses['/catalog/series/show/seasons/1/episodes'] = {'items': [
+            {'content_id': 'missing', 'episode_number': 2, 'files': []},
+            {'content_id': 'broken', 'episode_number': 3, 'files': [{'unreadable': True}]},
+            {'content_id': 'available', 'episode_number': 4, 'files': [{'unreadable': False}]}]}
+        result = Catalog(session).next_episode({'type': 'episode', 'series_id': 'show',
+                                                'season_number': 1, 'episode_number': 1})
+        self.assertEqual(result['content_id'], 'available')
+
     def test_libraries_honor_effective_hidden_settings(self):
         session = Session()
         session.responses['/settings/values/effective?keys=ui.disabled_library_ids'] = {

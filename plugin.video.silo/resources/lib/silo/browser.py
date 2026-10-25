@@ -2,6 +2,7 @@
 from pathlib import Path
 import re
 import threading
+import time
 from urllib.parse import urlencode
 
 import xbmc
@@ -11,9 +12,9 @@ import xbmcvfs
 
 from .catalog import Catalog, artwork
 from .layout import _BrowserLayout
-from .details import detail_labels
+from .details import detail_labels, watch_status
 from .artwork import _ArtworkPreloader
-from .controls import active_playback, playback_options
+from .controls import active_playback, playback_options, take_completed
 from .client import Error, Session
 from .ui import open_account, _text
 
@@ -56,6 +57,7 @@ class BrowserWindow(xbmcgui.WindowXML):
         self.artwork = None
 
     def onInit(self):
+        self.window_id = xbmcgui.getCurrentWindowId()
         # Kodi reinitializes this window when Back leaves fullscreen video.
         # Pause before restoring the catalog so browsing cannot advance playback.
         if active_playback(self.catalog.profile_id) and not xbmc.getCondVisibility('Player.Paused'):
@@ -74,6 +76,8 @@ class BrowserWindow(xbmcgui.WindowXML):
         if self.page:
             def restore():
                 self.catalog.invalidate()
+                if self.page['kind'] == 'item':
+                    self.page['data'] = self.catalog.item(self.page['data']['content_id'], fresh=False)
                 self._menu()
                 self._show(self.page)
             self._task(restore)
@@ -386,7 +390,7 @@ class BrowserWindow(xbmcgui.WindowXML):
         self._remember()
         if self.page:
             self.history.append(self.page)
-        self._show(page)
+        self._show(page, refresh=False)
 
     def _warm_artwork(self, items):
         if self.artwork is not None:
@@ -406,6 +410,10 @@ class BrowserWindow(xbmcgui.WindowXML):
         date = data.get('year') or data.get('air_date')
         if date:
             meta.append(str(date))
+        status = watch_status(data) if data.get('type') == 'episode' or 'episode_number' in data else ''
+        item.setProperty('watch_status', status)
+        if status:
+            meta.append(status)
         item.setProperty('meta', _text(' · '.join(meta)))
         return item
 
@@ -417,6 +425,8 @@ class BrowserWindow(xbmcgui.WindowXML):
         rows = self._home_rows(page, refresh) if page['kind'] == 'home' else None
         if self.closed.is_set():
             return
+        if refresh and page['kind'] == 'season' and 'season_number' in page:
+            page['items'] = self.catalog.episodes(page['data']['content_id'], page['season_number'])
         profile = self.session.status()['profile']
         if profile is None or profile['id'] != self.catalog.profile_id:
             raise Error('profile_changed')
@@ -439,6 +449,7 @@ class BrowserWindow(xbmcgui.WindowXML):
         self.getControl(300).setVisible(False)
         self.getControl(301).setVisible(kind in ('item', 'season'))
         self.getControl(302).setVisible(kind == 'item')
+        self.getControl(304).setVisible(bool(page.get('next_episode')))
         parent = kind == 'season' or (kind == 'item' and page['data'].get('type') == 'episode'
                                      and page['data'].get('series_id')
                                      and page['data'].get('season_number') is not None)
@@ -464,6 +475,10 @@ class BrowserWindow(xbmcgui.WindowXML):
                 self.getControl(identifier).setLabel(_text(labels[key]))
             if kind == 'season' or data['type'] == 'series':
                 self.getControl(24).setLabel('Episodes' if kind == 'season' else 'Seasons')
+            elif page.get('next_episode'):
+                following = page['next_episode']
+                self.getControl(24).setLabel(_text('Next: S{} E{} · {}'.format(
+                    following.get('season_number', ''), following['episode_number'], following.get('title') or 'Episode')))
             self.getControl(22).setText(_text(data.get('overview') or ''))
             if kind == 'season':
                 control_id = 220
@@ -496,7 +511,8 @@ class BrowserWindow(xbmcgui.WindowXML):
         destination = 300 if playable else control_id if control.size() else 301 if kind in ('item', 'season') else 100
         self.getControl(100).controlRight(self.getControl(destination))
         if kind in ('item', 'season'):
-            actions = ([300] if playable else []) + ([302] if kind == 'item' else [])
+            actions = ([300] if playable else []) + ([304] if page.get('next_episode') else [])
+            actions += [302] if kind == 'item' else []
             actions += ([303] if parent else []) + [301]
             for index, identifier in enumerate(actions):
                 button = self.getControl(identifier)
@@ -515,7 +531,41 @@ class BrowserWindow(xbmcgui.WindowXML):
         if data.get('type') not in ('movie', 'series', 'episode'):
             raise Error('invalid_response')
         seasons = self.catalog.seasons(content_id) if data['type'] == 'series' else []
-        self._push({'kind': 'item', 'title': data.get('title') or 'Untitled', 'data': data, 'items': seasons})
+        following = None
+        if data['type'] == 'episode':
+            try:
+                following = self.catalog.next_episode(data)
+            except Error:
+                xbmc.log('Silo: next episode is temporarily unavailable', xbmc.LOGWARNING)
+        self._push({'kind': 'item', 'title': data.get('title') or 'Untitled', 'data': data,
+                    'items': seasons, 'next_episode': following})
+
+    def _play_next(self):
+        following = self.page.get('next_episode')
+        if not following:
+            return
+        player = xbmc.Player()
+        if player.isPlaying():
+            playing = active_playback(self.catalog.profile_id)
+            if not playing or playing.get('content_id') != self.page['data']['content_id']:
+                raise Error('playback_active')
+            player.stop()
+        # The previous owner holds this lock until its final progress/stop report completes.
+        deadline = time.monotonic() + 35
+        monitor = xbmc.Monitor()
+        while not self.closed.is_set():
+            try:
+                with self.session.store.playback_lock():
+                    break
+            except Error as exc:
+                if exc.code != 'playback_active' or time.monotonic() >= deadline:
+                    raise
+                if monitor.waitForAbort(.1):
+                    return
+        if self.closed.is_set():
+            return
+        self._detail(following['content_id'])
+        self._play()
 
     def _season(self, season, series=None, episode_id=None):
         series = series if series is not None else self.page['data']
@@ -523,7 +573,7 @@ class BrowserWindow(xbmcgui.WindowXML):
         data = dict(series, poster_url=season.get('poster_url') or series.get('poster_url'))
         title = '{} · {}'.format(series['title'], 'Specials' if season['season_number'] == 0 else 'Season {}'.format(season['season_number']))
         selection = next((i for i, item in enumerate(episodes) if item['content_id'] == episode_id), 0)
-        self._push({'kind': 'season', 'title': title, 'data': data, 'items': episodes, 'selection': selection})
+        self._push({'kind': 'season', 'title': title, 'data': data, 'items': episodes, 'selection': selection, 'season_number': season['season_number']})
 
     def _parent(self):
         data = self.page['data']
@@ -539,11 +589,26 @@ class BrowserWindow(xbmcgui.WindowXML):
             try:
                 if not self.busy:
                     self._sync_bar()
+                    if xbmcgui.getCurrentWindowId() == self.window_id:
+                        completed = take_completed(self.catalog.profile_id)
+                        if completed:
+                            self._task(lambda content_id=completed: self._offer_next(content_id))
                 self._prefetch()
             except Exception:
                 if page is not None:
                     page['paging_failed'] = True
                 xbmc.log('Silo: background paging failed', xbmc.LOGERROR)
+
+    def _offer_next(self, content_id):
+        data = self.catalog.item(content_id, fresh=False)
+        following = self.catalog.next_episode(data)
+        if not following or xbmc.Player().isPlaying():
+            return
+        label = 'S{} E{} · {}'.format(following.get('season_number', ''), following['episode_number'],
+                                     following.get('title') or 'Episode')
+        if xbmcgui.Dialog().yesno('Next episode', _text(label), nolabel='Back to browsing', yeslabel='Play next'):
+            self._detail(following['content_id'])
+            self._play()
 
     def _sync_bar(self):
         state = active_playback(self.catalog.profile_id)
@@ -768,6 +833,8 @@ class BrowserWindow(xbmcgui.WindowXML):
             self._task(self._context)
         elif control == 303:
             self._task(self._parent)
+        elif control == 304:
+            self._task(self._play_next)
 
     def onFocus(self, control_id):
         if control_id not in range(500, 506):
