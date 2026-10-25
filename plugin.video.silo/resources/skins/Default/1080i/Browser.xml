@@ -4,12 +4,13 @@
   <controls>
     <control type="image"><left>0</left><top>0</top><width>1920</width><height>1080</height><texture colordiffuse="FF101014">white.png</texture></control>
     <control type="group" id="400"><left>120</left><top>0</top>
-    <control type="image" id="30"><left>0</left><top>0</top><width>1800</width><height>1080</height><aspectratio>scale</aspectratio><colordiffuse>44FFFFFF</colordiffuse></control>
+    <control type="image" id="30"><left>0</left><top>0</top><width>1800</width><height>1080</height><aspectratio>scale</aspectratio><colordiffuse>AAFFFFFF</colordiffuse></control>
+    <control type="image" id="32"><left>0</left><top>0</top><width>1800</width><height>1080</height><texture>details-fade.png</texture><visible>String.IsEqual(Window.Property(view),item) | String.IsEqual(Window.Property(view),season)</visible></control>
     <control type="label" id="12"><left>64</left><top>45</top><width>1660</width><height>75</height><font>font37</font><textcolor>FFFFFFFF</textcolor></control>
     <control type="label" id="20"><left>64</left><top>1010</top><width>1500</width><height>42</height><font>font23_narrow</font><textcolor>FFE8E8EC</textcolor></control>
-    <control type="label" id="21"><left>390</left><top>145</top><width>1340</width><height>50</height><font>font23_narrow</font><textcolor>FFD0D0DA</textcolor></control>
-    <control type="textbox" id="22"><left>390</left><top>220</top><width>1320</width><height>210</height><font>font27</font><textcolor>FFE8E8EC</textcolor></control>
-    <control type="image" id="31"><left>64</left><top>150</top><width>280</width><height>420</height><texture diffuse="card-280x420.png" /><aspectratio scalediffuse="false">scale</aspectratio></control>
+    <control type="label" id="21"><left>64</left><top>140</top><width>1660</width><height>40</height><font>font23_narrow</font><textcolor>FFD0D0DA</textcolor></control>
+    <control type="textbox" id="22"><left>64</left><top>230</top><width>1660</width><height>150</height><font>font27</font><textcolor>FFE8E8EC</textcolor></control>
+
     <control type="panel" id="200"><preloaditems>2</preloaditems><left>56</left><top>125</top><width>1664</width><height>885</height><orientation>vertical</orientation>
       <onleft>100</onleft><onright>200</onright><onup>200</onup><ondown>200</ondown>
       <visible>String.IsEqual(Window.Property(view),library) | String.IsEqual(Window.Property(view),section) | String.IsEqual(Window.Property(view),search)</visible>
@@ -27,43 +28,46 @@
         <control type="label"><left>10</left><top>254</top><width>188</width><height>25</height><font>font10</font><textcolor>FFD0D0DA</textcolor><label>$INFO[ListItem.Property(meta)]</label></control>
       </focusedlayout>
     </control>
-    <control type="list" id="210"><left>380</left><top>505</top><width>1340</width><height>440</height><orientation>horizontal</orientation>
-      <onleft>100</onleft><onright>210</onright><onup>301</onup><ondown>301</ondown>
-      <visible>String.IsEqual(Window.Property(view),item)</visible>
-      <itemlayout width="240" height="430">
-        <control type="image"><left>10</left><top>8</top><width>215</width><height>310</height><texture border="16" colordiffuse="FF24242C">rounded.png</texture></control>
-        <control type="image"><left>10</left><top>8</top><width>215</width><height>310</height><texture diffuse="card-215x310.png">$INFO[ListItem.Art(poster)]</texture><aspectratio scalediffuse="false">scale</aspectratio></control>
-        <control type="label"><left>12</left><top>330</top><width>215</width><height>40</height><font>font27</font><textcolor>FFE8E8EC</textcolor><label>$INFO[ListItem.Label]</label></control>
-        <control type="label"><left>12</left><top>375</top><width>215</width><height>35</height><font>font23_narrow</font><textcolor>FFA4A4AE</textcolor><label>$INFO[ListItem.Property(meta)]</label></control>
+    
+    <control type="list" id="210"><left>56</left><top>605</top><width>1664</width><height>345</height><orientation>horizontal</orientation><onleft>100</onleft><onright>210</onright><onup>302</onup><ondown>301</ondown><visible>String.IsEqual(Window.Property(view),item)</visible>
+      <itemlayout width="208" height="345">
+        <control type="image"><left>10</left><top>8</top><width>185</width><height>250</height><texture border="16" colordiffuse="FF24242C">rounded.png</texture></control>
+        <control type="image"><left>10</left><top>8</top><width>185</width><height>250</height><texture diffuse="card-185x250.png">$INFO[ListItem.Art(poster)]</texture><aspectratio scalediffuse="false">scale</aspectratio></control>
+        <control type="label"><left>10</left><top>265</top><width>185</width><height>32</height><font>font23_narrow</font><textcolor>FFE8E8EC</textcolor><label>$INFO[ListItem.Label]</label></control>
+        <control type="label"><left>10</left><top>300</top><width>185</width><height>38</height><font>font23_narrow</font><textcolor>FFA4A4AE</textcolor><label>$INFO[ListItem.Property(meta)]</label></control>
       </itemlayout>
-      <focusedlayout width="240" height="430">
-        <control type="image"><left>5</left><top>3</top><width>225</width><height>320</height><texture border="16" colordiffuse="FFFFFFFF">rounded.png</texture></control>
-        <control type="image"><left>10</left><top>8</top><width>215</width><height>310</height><texture border="16" colordiffuse="FF24242C">rounded.png</texture></control>
-        <control type="image"><left>10</left><top>8</top><width>215</width><height>310</height><texture diffuse="card-215x310.png">$INFO[ListItem.Art(poster)]</texture><aspectratio scalediffuse="false">scale</aspectratio></control>
-        <control type="label"><left>12</left><top>330</top><width>215</width><height>40</height><font>font27</font><textcolor>FFFFFFFF</textcolor><label>$INFO[ListItem.Label]</label></control>
-        <control type="label"><left>12</left><top>375</top><width>215</width><height>35</height><font>font23_narrow</font><textcolor>FFD0D0DA</textcolor><label>$INFO[ListItem.Property(meta)]</label></control>
+      <focusedlayout width="208" height="345">
+        <control type="image"><left>5</left><top>3</top><width>195</width><height>260</height><texture border="16" colordiffuse="$INFO[Window.Property(accent)]">rounded.png</texture><visible>Control.HasFocus(210)</visible></control>
+        <control type="image"><left>10</left><top>8</top><width>185</width><height>250</height><texture border="16" colordiffuse="FF24242C">rounded.png</texture></control>
+        <control type="image"><left>10</left><top>8</top><width>185</width><height>250</height><texture diffuse="card-185x250.png">$INFO[ListItem.Art(poster)]</texture><aspectratio scalediffuse="false">scale</aspectratio></control>
+        <control type="label"><left>10</left><top>265</top><width>185</width><height>32</height><font>font23_narrow</font><textcolor>FFE8E8EC</textcolor><label>$INFO[ListItem.Label]</label></control>
+        <control type="label"><left>10</left><top>300</top><width>185</width><height>38</height><font>font23_narrow</font><textcolor>FFA4A4AE</textcolor><label>$INFO[ListItem.Property(meta)]</label></control>
       </focusedlayout>
     </control>
-    <control type="list" id="220"><left>380</left><top>515</top><width>1340</width><height>495</height>
-      <onleft>100</onleft><onright>220</onright><onup>301</onup><ondown>301</ondown>
-      <visible>String.IsEqual(Window.Property(view),season)</visible>
-      <itemlayout width="1100" height="155">
-        <control type="image"><left>10</left><top>5</top><width>250</width><height>140</height><texture border="16" colordiffuse="FF24242C">rounded.png</texture></control>
-        <control type="image"><left>10</left><top>5</top><width>250</width><height>140</height><texture diffuse="card-250x140.png">$INFO[ListItem.Art(poster)]</texture><aspectratio scalediffuse="false">scale</aspectratio></control>
-        <control type="label"><left>285</left><top>5</top><width>770</width><height>45</height><font>font23_narrow</font><textcolor>FFE8E8EC</textcolor><label>$INFO[ListItem.Label]</label></control>
-        <control type="textbox"><left>285</left><top>55</top><width>770</width><height>80</height><font>font23_narrow</font><textcolor>FFB4B4BE</textcolor><label>$INFO[ListItem.Property(summary)]</label></control>
+    
+    <control type="list" id="220"><left>56</left><top>605</top><width>1664</width><height>405</height><onleft>100</onleft><onright>220</onright><onup>301</onup><ondown>301</ondown><visible>String.IsEqual(Window.Property(view),season)</visible>
+      <itemlayout width="1424" height="125">
+        <control type="image"><left>10</left><top>5</top><width>200</width><height>112</height><texture border="16" colordiffuse="FF24242C">rounded.png</texture></control>
+        <control type="image"><left>10</left><top>5</top><width>200</width><height>112</height><texture diffuse="card-250x140.png">$INFO[ListItem.Art(poster)]</texture><aspectratio scalediffuse="false">scale</aspectratio></control>
+        <control type="label"><left>235</left><top>5</top><width>1150</width><height>45</height><font>font23_narrow</font><textcolor>FFE8E8EC</textcolor><label>$INFO[ListItem.Label]</label></control>
+        <control type="textbox"><left>235</left><top>48</top><width>1150</width><height>65</height><font>font23_narrow</font><textcolor>FFB4B4BE</textcolor><label>$INFO[ListItem.Property(summary)]</label></control>
       </itemlayout>
-      <focusedlayout width="1100" height="155">
-        <control type="image"><left>0</left><top>0</top><width>1090</width><height>150</height><texture border="16" colordiffuse="FF34343C">rounded.png</texture></control>
-        <control type="image"><left>5</left><top>0</top><width>260</width><height>150</height><texture border="16" colordiffuse="FFFFFFFF">rounded.png</texture></control>
-        <control type="image"><left>10</left><top>5</top><width>250</width><height>140</height><texture border="16" colordiffuse="FF24242C">rounded.png</texture></control>
-        <control type="image"><left>10</left><top>5</top><width>250</width><height>140</height><texture diffuse="card-250x140.png">$INFO[ListItem.Art(poster)]</texture><aspectratio scalediffuse="false">scale</aspectratio></control>
-        <control type="label"><left>285</left><top>5</top><width>770</width><height>45</height><font>font23_narrow</font><textcolor>FFFFFFFF</textcolor><label>$INFO[ListItem.Label]</label></control>
-        <control type="textbox"><left>285</left><top>55</top><width>770</width><height>80</height><font>font23_narrow</font><textcolor>FFE8E8EC</textcolor><label>$INFO[ListItem.Property(summary)]</label></control>
+      <focusedlayout width="1424" height="125">
+        <control type="image"><left>0</left><top>0</top><width>1414</width><height>120</height><texture border="16" colordiffuse="FF34343C">rounded.png</texture></control>
+        <control type="image"><left>5</left><top>0</top><width>210</width><height>122</height><texture border="16" colordiffuse="FFFFFFFF">rounded.png</texture></control>
+        <control type="image"><left>10</left><top>5</top><width>200</width><height>112</height><texture border="16" colordiffuse="FF24242C">rounded.png</texture></control>
+        <control type="image"><left>10</left><top>5</top><width>200</width><height>112</height><texture diffuse="card-250x140.png">$INFO[ListItem.Art(poster)]</texture><aspectratio scalediffuse="false">scale</aspectratio></control>
+        <control type="label"><left>235</left><top>5</top><width>1150</width><height>45</height><font>font23_narrow</font><textcolor>FFFFFFFF</textcolor><label>$INFO[ListItem.Label]</label></control>
+        <control type="textbox"><left>235</left><top>48</top><width>1150</width><height>65</height><font>font23_narrow</font><textcolor>FFE8E8EC</textcolor><label>$INFO[ListItem.Property(summary)]</label></control>
       </focusedlayout>
     </control>
-    <control type="button" id="300"><left>390</left><top>445</top><width>240</width><height>55</height><font>font27</font><label>Play</label><textcolor>FF141417</textcolor><disabledcolor>FF777780</disabledcolor><focusedcolor>FF141417</focusedcolor><texturefocus border="16" colordiffuse="FFFFFFFF">rounded.png</texturefocus><texturenofocus border="16" colordiffuse="$INFO[Window.Property(accent)]">rounded.png</texturenofocus><onleft>100</onleft><onright>210</onright><onup>301</onup><ondown>301</ondown></control>
-    <control type="button" id="301"><left>650</left><top>445</top><width>180</width><height>55</height><font>font27</font><label>Back</label><textcolor>FFE8E8EC</textcolor><focusedcolor>FF141417</focusedcolor><texturefocus border="16" colordiffuse="FFFFFFFF">rounded.png</texturefocus><texturenofocus border="16" colordiffuse="FF303038">rounded.png</texturenofocus><onleft>100</onleft><onright>210</onright><onup>300</onup><ondown>220</ondown></control>
+    <control type="button" id="300"><left>64</left><top>490</top><width>240</width><height>55</height><font>font27</font><label>Play</label><textcolor>FF141417</textcolor><disabledcolor>FF777780</disabledcolor><focusedcolor>FF141417</focusedcolor><texturefocus border="16" colordiffuse="FFFFFFFF">rounded.png</texturefocus><texturenofocus border="16" colordiffuse="$INFO[Window.Property(accent)]">rounded.png</texturenofocus><onleft>100</onleft><onright>210</onright><onup>301</onup><ondown>301</ondown></control>
+    <control type="button" id="301"><left>584</left><top>490</top><width>180</width><height>55</height><font>font27</font><label>Back</label><textcolor>FFE8E8EC</textcolor><focusedcolor>FF141417</focusedcolor><texturefocus border="16" colordiffuse="FFFFFFFF">rounded.png</texturefocus><texturenofocus border="16" colordiffuse="FF303038">rounded.png</texturenofocus><onleft>302</onleft><onright>210</onright><onup>300</onup><ondown>220</ondown></control>
+    <control type="label" id="24"><left>64</left><top>555</top><width>1660</width><height>40</height><font>font23_narrow</font><textcolor>FFE8E8EC</textcolor><scroll>true</scroll></control>
+    <control type="label" id="25"><left>64</left><top>185</top><width>1660</width><height>40</height><font>font23_narrow</font><textcolor>FFC4A7F2</textcolor><scroll>true</scroll></control>
+    <control type="label" id="26"><left>64</left><top>390</top><width>1660</width><height>40</height><font>font23_narrow</font><textcolor>FFD0D0DA</textcolor><scroll>true</scroll></control>
+    <control type="label" id="27"><left>64</left><top>435</top><width>1660</width><height>40</height><font>font23_narrow</font><textcolor>FFB4B4BE</textcolor><scroll>true</scroll></control>
+    <control type="button" id="302"><left>324</left><top>490</top><width>240</width><height>55</height><font>font27</font><label>Options</label><textcolor>FFE8E8EC</textcolor><focusedcolor>FF141417</focusedcolor><texturefocus border="16" colordiffuse="FFFFFFFF">rounded.png</texturefocus><texturenofocus border="16" colordiffuse="FF303038">rounded.png</texturenofocus><onleft>300</onleft><onright>301</onright><onup>100</onup><ondown>210</ondown></control>
     <control type="label" id="40"><left>64</left><top>133</top><width>1664</width><height>45</height><font>font27</font><textcolor>FFE8E8EC</textcolor><visible>String.IsEqual(Window.Property(view),home)</visible></control>
     <control type="list" id="230"><preloaditems>2</preloaditems><left>56</left><top>185</top><width>1664</width><height>345</height><orientation>horizontal</orientation>
       <onleft>100</onleft><onright>230</onright><onup>230</onup><ondown>230</ondown>

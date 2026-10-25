@@ -33,6 +33,16 @@ def png(width, height, pixels):
             + chunk(b'IDAT', zlib.compress(pixels, 9)) + chunk(b'IEND', b''))
 
 
+def detail_fade():
+    pixels = bytearray()
+    for y in range(108):
+        pixels.append(0)
+        for x in range(180):
+            opacity = max(.8 * (1 - x / 180), min(1, y / 65))
+            pixels.extend((16, 16, 20, round(255 * opacity)))
+    return png(180, 108, pixels)
+
+
 def icon(segments, circles=()):
     pixels = bytearray()
     for y in range(128):
@@ -72,6 +82,7 @@ def navigation_icons():
 
 if __name__ == '__main__':
     OUTPUT.mkdir(parents=True, exist_ok=True)
+    (OUTPUT / 'details-fade.png').write_bytes(detail_fade())
     navigation_icons()
     (OUTPUT / 'rounded.png').write_bytes(rounded(64, 64, 16))
     for width, height in ((150, 225), (185, 250), (215, 310), (250, 140), (280, 420)):

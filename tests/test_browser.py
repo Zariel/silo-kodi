@@ -343,6 +343,22 @@ class HomeNavigation(unittest.TestCase):
         self.assertEqual(control.position, 3)
         self.assertFalse(self.window.page['items'][3]['user_state']['is_favorite'])
 
+    def test_detail_options_target_the_series(self):
+        self.catalog.item.side_effect = None
+        self.catalog.item.return_value = {'content_id': 'series', 'type': 'series', 'title': 'Series',
+                                          'user_state': {'played': False, 'is_favorite': True}}
+        self.catalog.seasons.return_value = [{'season_number': 1}]
+        self.window._detail('series')
+        self.window.setFocusId(302)
+        dialog = Mock()
+        dialog.contextmenu.return_value = -1
+        globals_ = self.window.onClick.__globals__
+        with patch.object(globals_['xbmcgui'], 'Dialog', return_value=dialog, create=True):
+            self.window.onClick(302)
+        self.catalog.item.assert_called_with('series')
+        self.assertIn('Remove from favourites', dialog.contextmenu.call_args.args[0])
+        self.catalog.set_state.assert_not_called()
+
     def test_context_cancel_and_missing_state_do_not_mutate(self):
         self.library()
         dialog = Mock()

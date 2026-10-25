@@ -4,7 +4,7 @@
 class _BrowserLayout:
     # These controls fill the content region. Posters and buttons keep their
     # intrinsic sizes; lists let Kodi derive the number of visible cards.
-    _FILL = (12, 20, 21, 22, 23, 30, 40, 41, 42, 200, 210, 220, 230, 231, 232)
+    _FILL = (12, 20, 21, 22, 23, 24, 25, 26, 27, 30, 32, 40, 41, 42, 200, 210, 220, 230, 231, 232)
     _LISTS = (100, 200, 210, 220, 230, 231, 232)
     _COMPACT = 120
     _EXPANDED = 360

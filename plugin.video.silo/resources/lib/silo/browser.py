@@ -11,6 +11,7 @@ import xbmcvfs
 
 from .catalog import Catalog, artwork
 from .layout import _BrowserLayout
+from .details import detail_labels
 from .artwork import _ArtworkPreloader
 from .controls import active_playback, playback_options
 from .client import Error, Session
@@ -256,7 +257,7 @@ class BrowserWindow(xbmcgui.WindowXML):
             items = rows[slot][1]['items'] if slot < len(rows) else []
         elif focus in (200, 220):
             items = self.page.get('items', [])
-        elif focus == 300 and self.page['kind'] == 'item':
+        elif focus in (300, 302) and self.page['kind'] == 'item':
             return self.page['data']
         else:
             return None
@@ -402,11 +403,13 @@ class BrowserWindow(xbmcgui.WindowXML):
         self.getControl(21).setLabel('')
         self.getControl(22).setText('')
         self.getControl(30).setImage('')
-        self.getControl(31).setImage('')
+        for identifier in (24, 25, 26, 27):
+            self.getControl(identifier).setLabel('')
         for identifier in ((200, 210, 220) if kind == 'home' else (200, 210, 220, 230, 231, 232)):
             self.getControl(identifier).reset()
         self.getControl(300).setVisible(False)
         self.getControl(301).setVisible(kind in ('item', 'season'))
+        self.getControl(302).setVisible(kind == 'item')
         if kind == 'home':
             self._show_home(page, *rows)
             return
@@ -420,12 +423,11 @@ class BrowserWindow(xbmcgui.WindowXML):
         else:
             data = page['data']
             self.getControl(30).setImage(artwork(self.session.server, data.get('backdrop_url')))
-            self.getControl(31).setImage(artwork(self.session.server, data.get('poster_url')))
-            metadata = [str(data[key]) for key in ('year', 'content_rating') if data.get(key)]
-            if data.get('runtime'):
-                metadata.append('{} min'.format(data['runtime']))
-            metadata.extend(data.get('genres', [])[:3])
-            self.getControl(21).setLabel(_text('  •  '.join(metadata)))
+            labels = detail_labels(data, page['items'], season=kind == 'season')
+            for identifier, key in ((21, 'facts'), (25, 'ratings'), (26, 'credits'), (27, 'format')):
+                self.getControl(identifier).setLabel(_text(labels[key]))
+            if kind == 'season' or data['type'] == 'series':
+                self.getControl(24).setLabel('Episodes' if kind == 'season' else 'Seasons')
             self.getControl(22).setText(_text(data.get('overview') or ''))
             if kind == 'season':
                 control_id = 220
@@ -451,6 +453,8 @@ class BrowserWindow(xbmcgui.WindowXML):
         control = self.getControl(control_id)
         control.selectItem(page.get('selection', 0))
         playable = kind == 'item' and page['data']['type'] in ('movie', 'episode')
+        self.getControl(302).setPosition(324 if playable else 64, 490)
+        self.getControl(301).setPosition(584 if playable else 324 if kind == 'item' else 64, 490)
         focus = page.get('focus', 300 if playable else control_id if control.size() else 301 if kind in ('item', 'season') else 100)
         if self.keep_sidebar_focus:
             focus = 100
@@ -460,9 +464,12 @@ class BrowserWindow(xbmcgui.WindowXML):
         self.getControl(301).controlRight(self.getControl(control_id if control.size() else 100))
         self.getControl(301).controlUp(self.getControl(control_id if control.size() else 100))
         self.getControl(301).controlDown(self.getControl(control_id if control.size() else 100))
+        self.getControl(302).controlLeft(self.getControl(300 if playable else 100))
+        self.getControl(302).controlDown(self.getControl(control_id if control.size() else 301))
+        self.getControl(301).controlLeft(self.getControl(302 if kind == 'item' else 100))
         if playable:
             self.getControl(301).controlUp(self.getControl(300))
-            self.getControl(300).controlRight(self.getControl(301))
+            self.getControl(300).controlRight(self.getControl(302))
 
     def _detail(self, content_id):
         data = self.catalog.item(content_id, fresh=False)
@@ -666,6 +673,8 @@ class BrowserWindow(xbmcgui.WindowXML):
             self._back()
         elif control == 300:
             self._task(self._play)
+        elif control == 302:
+            self._task(self._context)
 
     def onFocus(self, control_id):
         if self.layout is not None:
