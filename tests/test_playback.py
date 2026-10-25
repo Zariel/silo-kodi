@@ -65,6 +65,16 @@ class Server:
 
 
 class Playback(unittest.TestCase):
+    def test_intro_marker_belongs_to_selected_file(self):
+        server = Server()
+        server.versions = [
+            {'file_id': 'other', 'intro': {'start': 0, 'end': 120}},
+            {'file_id': '42', 'intro': {'start': 10, 'end': 40}}]
+        attempt = Attempt(server, 'viewer', '42', content_id='episode')
+        self.assertEqual(attempt.intro, (10, 40))
+        server.versions[1].pop('intro')
+        self.assertIsNone(Attempt(server, 'viewer', '42', content_id='episode').intro)
+
     def test_rejects_wrong_source_before_returning_media_grant(self):
         for stage in ('start', 'replan'):
             for identity in (None, 'different-file'):

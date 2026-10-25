@@ -58,6 +58,8 @@ Resolve the next playable episode from the current season's episode list in nume
 
 After natural completion and successful session cleanup, the playback owner publishes a short-lived, profile-scoped completion event. The active browser consumes it once and offers Play next or Back to browsing. There is no countdown or autoplay. A new playback owner clears stale completion events.
 
+Use the selected file's `intro` marker from the existing versions response. Accept only finite bounds inside the native player's duration and a source-aligned timeline. A playback-owned Kodi dialog offers Skip intro only during that interval; selecting it requests a native seek after rechecking the interval. Dismissal suppresses the prompt for that playback attempt. Missing or invalid markers produce no prompt, and the client never estimates intro timing.
+
 ### Initial TV layouts
 
 - **Browse:** a narrow left navigation rail with library names and profile access, followed by a spacious poster grid. Begin with approximately six posters across the content area at 1080p and adjust after viewing on a TV. Show the title and secondary metadata below each poster. Keep badges legible and limited to useful source-format information; they describe the file, not verified output capability.

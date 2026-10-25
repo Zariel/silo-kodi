@@ -82,6 +82,7 @@ class Lifetime(unittest.TestCase):
 
         class Attempt:
             def __init__(self, *args, **kwargs):
+                self.intro = None
                 self.audio_tracks = None
                 self.subtitle_tracks = []
                 self.native_subtitles = False

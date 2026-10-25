@@ -44,6 +44,8 @@ Choose **Play** on a movie or episode. If Silo has saved your progress, you can 
 
 Episode lists show watched ticks and saved viewing progress. Choose **Play next** on an episode's details to move to the following available episode. At the end of an episode, you can choose to play the next one or return to browsing; episodes never start automatically.
 
+When Silo provides an intro marker for your selected video, **Skip intro** appears during the intro. Select it to skip, or press Back to dismiss it.
+
 Press **Back** during playback to pause and return to the page you launched it from. Further Back presses follow your browsing history, restoring selection and scroll position. Choose **Resume playback** in the sidebar, or **Resume** on the playing title, to continue watching. Home and library shortcuts start a fresh browsing history.
 
 While video is playing or paused, a bottom playback bar shows its title, time and progress. Move Down from the bottom of a list or the sidebar to use Play/Pause, skip back 10 seconds, skip forward 30 seconds, Fullscreen, Options or Stop. Up or Back returns to your previous browsing control.

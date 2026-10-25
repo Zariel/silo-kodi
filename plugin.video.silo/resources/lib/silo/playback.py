@@ -4,6 +4,7 @@ import uuid
 from urllib.parse import quote, urlencode, urljoin, urlsplit
 
 from .client import Error
+from .markers import intro_range
 
 
 def capabilities():
@@ -85,12 +86,14 @@ class Attempt:
         self.audio_tracks = None
         self.subtitle_tracks = []
         self.native_subtitles = False
+        self.intro = None
         container = None
         if content_id is not None:
             versions = self._request('GET', '/catalog/items/' + quote(str(content_id), safe='') + '/versions')['items']
             version = next((item for item in versions if str(item['file_id']) == str(file_id)), None)
             if version is None:
                 raise Error('unsupported_playback')
+            self.intro = intro_range(version.get('intro'))
             self.audio_tracks = version.get('audio_tracks')
             self.subtitle_tracks = version.get('subtitle_tracks') or []
             container = version.get('container')

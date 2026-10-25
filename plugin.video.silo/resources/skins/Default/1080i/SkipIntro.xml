@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<window>
+  <defaultcontrol always="true">10</defaultcontrol>
+  <controls>
+    <control type="button" id="10">
+      <left>1560</left><top>870</top><width>300</width><height>64</height>
+      <font>font27</font><align>center</align><label>Skip intro</label>
+      <textcolor>FF141417</textcolor><focusedcolor>FF141417</focusedcolor>
+      <texturefocus border="16" colordiffuse="FFFFFFFF">rounded.png</texturefocus>
+      <texturenofocus border="16" colordiffuse="FFE8E8EC">rounded.png</texturenofocus>
+      <onleft>10</onleft><onright>10</onright><onup>10</onup><ondown>10</ondown>
+    </control>
+    <control type="label"><left>1560</left><top>940</top><width>300</width><height>32</height><font>font23_narrow</font><align>center</align><textcolor>FFE8E8EC</textcolor><label>Back to dismiss</label></control>
+  </controls>
+</window>

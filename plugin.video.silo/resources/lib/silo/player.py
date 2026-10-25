@@ -74,6 +74,7 @@ def play(handle, session, profile_id, file_id, title, start_position=None, sourc
     attempt = None
     relay = None
     controls = None
+    skip_intro = None
     resolved = False
     last_position = None
     paused = False
@@ -89,6 +90,11 @@ def play(handle, session, profile_id, file_id, title, start_position=None, sourc
                 controls = PlaybackControls(profile_id, content_id, title)
                 attempt = Attempt(session, profile_id, file_id, start_position,
                                   subtitle_track_id=subtitle_track_id, content_id=content_id)
+                if attempt.intro:
+                    import xbmcaddon
+                    from .skip_intro import SkipIntro
+                    skip_intro = SkipIntro('SkipIntro.xml', xbmcaddon.Addon('plugin.video.silo').getAddonInfo('path'),
+                                           'Default', '1080i', segment=attempt.intro)
                 audio = SourceAudio(file_id, attempt.audio_tracks,
                                     lambda value: xbmc.convertLanguage(value, xbmc.ISO_639_2)) if attempt.audio_tracks else None
                 subtitles = SourceSubtitles(attempt.subtitle_tracks,
@@ -116,6 +122,8 @@ def play(handle, session, profile_id, file_id, title, start_position=None, sourc
                 subtitle_deadline = None
                 while not monitor.abortRequested():
                     if pending_url is not None:
+                        if skip_intro:
+                            skip_intro.close()
                         # Core changes can emit an old stop callback. Commit only
                         # after the new dynamic URL is observed with A/V ready.
                         try:
@@ -191,6 +199,11 @@ def play(handle, session, profile_id, file_id, title, start_position=None, sourc
                                 monitor.waitForAbort(.25)
                                 continue
                     last_position = position
+                    if skip_intro:
+                        target = skip_intro.update(position, duration,
+                                                   attempt.plan.get('timeline', {}).get('timeline_offset_seconds', 0) == 0)
+                        if target is not None and _owns(player, url, source):
+                            player.seekTime(target)
                     request = controls.take()
                     if request is not None:
                         previous_delivery = attempt.plan.get('delivery')
@@ -286,6 +299,8 @@ def play(handle, session, profile_id, file_id, title, start_position=None, sourc
                 if player.completed and duration and pending_url is None:
                     last_position = duration
             finally:
+                if skip_intro:
+                    skip_intro.close()
                 if controls:
                     controls.close()
                 # Close the player before revoking its stream, including failures
