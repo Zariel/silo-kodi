@@ -67,7 +67,7 @@ class BrowserWindow(xbmcgui.WindowXML):
         self.catalog.artwork_scale = max(1, xbmcgui.getScreenWidth() / 1920)
         if self.layout is None:
             self.layout = _BrowserLayout(self)
-        self.layout.apply(True)
+        self.layout.apply(True, force=True)
         self.bar_visible = None
         self._sync_bar()
         if self.pager is None:

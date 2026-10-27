@@ -13,8 +13,12 @@ class _BrowserLayout:
         self.window = window
         self.widths = {identifier: window.getControl(identifier).getWidth() for identifier in self._FILL}
 
-    def apply(self, expanded):
+    def apply(self, expanded, force=False):
         window = self.window
+        inset = self._EXPANDED if expanded else self._COMPACT
+        # Geometry belongs to sidebar transitions, not item focus notifications.
+        if not force and window.getControl(400).getPosition()[0] == inset:
+            return
         selections = {identifier: window.getControl(identifier).getSelectedPosition()
                       for identifier in self._LISTS if window.getControl(identifier).size()}
         inset = self._EXPANDED if expanded else self._COMPACT

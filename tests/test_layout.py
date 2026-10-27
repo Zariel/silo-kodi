@@ -36,6 +36,9 @@ class Control:
         self.height = height
         self.selection = 0
 
+    def getPosition(self):
+        return self.x, self.y
+
     def setPosition(self, x, y):
         self.x, self.y = x, y
 
@@ -54,6 +57,21 @@ class Window:
 
 
 class BrowserLayout(unittest.TestCase):
+    def test_focus_with_unchanged_sidebar_does_not_mutate_lists(self):
+        from unittest.mock import Mock
+        path = Path(__file__).resolve().parents[1] / 'plugin.video.silo.kodi/resources/skins/Default/1080i/Browser.xml'
+        window = Window(ET.parse(path).getroot())
+        layout = _BrowserLayout(window)
+        layout.apply(True, force=True)
+        layout.apply(False)
+        for identifier in layout._LISTS:
+            control = window.getControl(identifier)
+            control.count = 100
+            control.setWidth = Mock(side_effect=AssertionError('resizing during navigation'))
+            control.selectItem = Mock(side_effect=AssertionError('overwriting navigation'))
+        layout.apply(False)
+
+
     def test_playback_overlay_leaves_room_and_preserves_selection(self):
         path = Path(__file__).resolve().parents[1] / 'plugin.video.silo.kodi/resources/skins/Default/1080i/Browser.xml'
         window = Window(ET.parse(path).getroot())
