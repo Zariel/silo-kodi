@@ -14,6 +14,7 @@ class SkipIntro(xbmcgui.WindowXMLDialog):
         self.requested = None
         self.dismissed = set()
         self.visible = False
+        self.setProperty('intro_dismissed', 'false')
 
     def update(self, position, duration, enabled=True):
         current = intro_at(self.segment, position, duration) if enabled else None
@@ -34,22 +35,30 @@ class SkipIntro(xbmcgui.WindowXMLDialog):
         if not current or current in self.dismissed or not fullscreen:
             self.close()
         elif not self.visible and xbmcgui.getCurrentWindowDialogId() <= 9999:
-            self.visible = True
-            self.show()
+            # Kodi can deliver a queued click while querying or opening a window.
+            if current not in self.dismissed:
+                self.visible = True
+                self.show()
+                if current in self.dismissed:
+                    self.close()
         return None
+
+    def _dismiss(self):
+        if self.current:
+            self.dismissed.add(self.current)
+        # Hide the entire prompt before asking Kodi to close its native dialog.
+        self.setProperty('intro_dismissed', 'true')
+        self.close()
 
     def onClick(self, control):
         if control == 10 and self.current:
             self.requested = self.current
-            self.dismissed.add(self.current)
-            self.close()
+            self._dismiss()
 
     def onAction(self, action):
         identifier = action.getId()
         if identifier in (1, 2, 3, 4, 9, 10, 92):
-            if self.current:
-                self.dismissed.add(self.current)
-            self.close()
+            self._dismiss()
             navigation = {1: 'StepBack', 2: 'StepForward', 3: 'BigStepForward', 4: 'BigStepBack'}
             if identifier in navigation:
                 xbmc.executebuiltin('Action({})'.format(navigation[identifier]))

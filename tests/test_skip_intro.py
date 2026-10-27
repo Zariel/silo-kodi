@@ -11,6 +11,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'plugin.video.silo.
 class Dialog:
     def __init__(self, *args, **kwargs):
         self.shown = False
+        self.properties = {}
+
+    def setProperty(self, key, value):
+        self.properties[key] = value
 
     def show(self):
         self.shown = True
@@ -56,8 +60,25 @@ class SkipPrompt(unittest.TestCase):
         self.assertTrue(self.prompt.shown)
         self.prompt.onClick(10)
         self.assertFalse(self.prompt.shown)
+        self.assertEqual(self.prompt.properties['intro_dismissed'], 'true')
         self.assertEqual(self.prompt.update(16, 600), 40)
         self.assertIsNone(self.prompt.update(17, 600))
+        self.assertFalse(self.prompt.shown)
+
+    def test_delayed_click_during_reopening_does_not_restore_prompt(self):
+        self.prompt.update(15, 600)
+        self.gui.getCurrentWindowId = lambda: 13000
+        self.prompt.update(16, 600)
+        self.gui.getCurrentWindowId = lambda: 12005
+
+        def delayed_click():
+            self.prompt.onClick(10)
+            return 9999
+
+        self.gui.getCurrentWindowDialogId = delayed_click
+        self.prompt.update(17, 600)
+        self.assertFalse(self.prompt.shown)
+        self.assertEqual(self.prompt.update(18, 600), 40)
         self.assertFalse(self.prompt.shown)
 
     def test_late_click_cannot_seek_back_into_finished_intro(self):
