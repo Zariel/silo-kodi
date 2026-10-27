@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock, patch
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'plugin.video.silo/resources/lib'))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'plugin.video.silo.kodi/resources/lib'))
 
 
 class Dialog:
@@ -24,7 +24,7 @@ class SkipPrompt(unittest.TestCase):
         self.gui = SimpleNamespace(WindowXMLDialog=Dialog, getCurrentWindowId=lambda: 12005,
                                    getCurrentWindowDialogId=lambda: 9999)
         self.xbmc = SimpleNamespace(executebuiltin=Mock(), getCondVisibility=lambda _: False)
-        path = Path(__file__).resolve().parents[1] / 'plugin.video.silo/resources/lib/silo/skip_intro.py'
+        path = Path(__file__).resolve().parents[1] / 'plugin.video.silo.kodi/resources/lib/silo/skip_intro.py'
         spec = importlib.util.spec_from_file_location('silo.skip_intro_test', path)
         module = importlib.util.module_from_spec(spec)
         with patch.dict(sys.modules, {'xbmcgui': self.gui, 'xbmc': self.xbmc}):

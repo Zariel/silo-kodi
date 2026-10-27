@@ -48,7 +48,7 @@ class _Countdown(xbmcgui.WindowXMLDialog):
 
 
 def confirm_next(title, seconds, valid):
-    dialog = _Countdown('NextEpisode.xml', xbmcaddon.Addon('plugin.video.silo').getAddonInfo('path'),
+    dialog = _Countdown('NextEpisode.xml', xbmcaddon.Addon('plugin.video.silo.kodi').getAddonInfo('path'),
                         'Default', '1080i', title=title, seconds=seconds)
     monitor = xbmc.Monitor()
     opening_deadline = time.monotonic() + 10

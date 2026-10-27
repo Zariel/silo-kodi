@@ -6,9 +6,9 @@ import time
 import xbmc
 import xbmcgui
 
-_STATE = 'silo.playback.state'
-_REQUEST = 'silo.playback.request'
-_COMPLETED = 'silo.playback.completed'
+_STATE = 'plugin.video.silo.kodi.playback.state'
+_REQUEST = 'plugin.video.silo.kodi.playback.request'
+_COMPLETED = 'plugin.video.silo.kodi.playback.completed'
 
 
 def _read(window, key):

@@ -6,7 +6,7 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock, patch
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'plugin.video.silo/resources/lib'))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'plugin.video.silo.kodi/resources/lib'))
 
 
 class Lifetime(unittest.TestCase):
@@ -171,7 +171,7 @@ class Lifetime(unittest.TestCase):
             'xbmcgui': SimpleNamespace(ListItem=Mock(return_value=item), Dialog=Mock(), NOTIFICATION_ERROR=1),
             'xbmcplugin': SimpleNamespace(setResolvedUrl=resolve),
         }
-        path = Path(__file__).resolve().parents[1] / 'plugin.video.silo/resources/lib/silo/player.py'
+        path = Path(__file__).resolve().parents[1] / 'plugin.video.silo.kodi/resources/lib/silo/player.py'
         spec = importlib.util.spec_from_file_location('silo.player_test', path)
         module = importlib.util.module_from_spec(spec)
         with patch.dict(sys.modules, modules):
@@ -251,7 +251,7 @@ class Lifetime(unittest.TestCase):
         self.assertEqual(state.file, 'https://other.example.test/replacement')
 
     def test_list_item_retains_plugin_identity_for_kodi_bookkeeping(self):
-        source = 'plugin://plugin.video.silo/?action=play&file=example'
+        source = 'plugin://plugin.video.silo.kodi/?action=play&file=example'
         state = self.run_playback('subtitle_error', source=source)
         self.assertEqual(state.item_properties['original_listitem_url'], source)
 

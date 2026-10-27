@@ -28,6 +28,6 @@ jobs:
           RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
           gh release upload "$RELEASE_TAG" \
-            "dist/plugin.video.silo-${RELEASE_TAG#v}.zip" \
-            "dist/plugin.video.silo-${RELEASE_TAG#v}.zip.sha256" \
+            "dist/plugin.video.silo.kodi-${RELEASE_TAG#v}.zip" \
+            "dist/plugin.video.silo.kodi-${RELEASE_TAG#v}.zip.sha256" \
             --repo "$GITHUB_REPOSITORY"

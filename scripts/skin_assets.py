@@ -4,7 +4,7 @@ import struct
 import zlib
 
 
-OUTPUT = Path(__file__).resolve().parents[1] / 'plugin.video.silo/resources/skins/Default/media'
+OUTPUT = Path(__file__).resolve().parents[1] / 'plugin.video.silo.kodi/resources/skins/Default/media'
 
 
 def rounded(width, height, radius):

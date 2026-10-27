@@ -36,7 +36,7 @@ python scripts/dev.py smoke
 
 `probe` reads OS, interpreter, Kodi version, active players, HDMI capability files, Ethernet link speed, and Silo's public server identity. Capture raw results under `.scratch/`, not in version control.
 
-`deploy` refuses to run while Kodi is playing. It copies and verifies the ZIP by SHA-256, extracts a fresh add-on tree, and saves the previous tree at `/storage/.kodi/temp/silo-kodi-previous`. It asks Kodi to rescan and enable the add-on through supported interfaces, waits for the expected version, then executes its status route through `Files.GetDirectory`. No Kodi restart or SQLite edits are needed. The backup holds only the previous deployment and is replaced on the next deploy. Deployment preserves user data under `userdata/addon_data`. When `--server` or `SILO_SERVER_URL` is set, it configures that server through the shared helper; using the same URL preserves login, while changing it clears origin-bound credentials.
+`deploy` refuses to run while Kodi is playing. It copies and verifies the ZIP by SHA-256, extracts a fresh add-on tree, and saves the previous tree at `/storage/.kodi/temp/plugin.video.silo.kodi-previous`. It asks Kodi to rescan and enable the add-on through supported interfaces, waits for the expected version, then executes its status route through `Files.GetDirectory`. No Kodi restart or SQLite edits are needed. The backup holds only the previous deployment and is replaced on the next deploy. Deployment preserves user data under `userdata/addon_data`. When `--server` or `SILO_SERVER_URL` is set, it configures that server through the shared helper; using the same URL preserves login, while changing it clears origin-bound credentials.
 
 When adding localization resources, install the packaged ZIP through Kodi's **Install from zip file** once. Kodi's installer loads add-on translations; a filesystem replacement and add-on rescan alone can leave new settings labels blank. Confirm settings through the sidebar, save changes, reopen the window, and independently inspect the add-on's persisted settings. Restore prior preferences after automatic-playback tests.
 
@@ -97,7 +97,7 @@ Developer playback routes must also include `content=<catalog-content-id>` to ex
 The packaged `auth.py` helper uses the same implementation and protected credential store as the account screen. Run it on the target over SSH to keep tokens on the device:
 
 ```sh
-ssh $SILO_SSH_OPTIONS "$SILO_SSH_TARGET" 'python3 /storage/.kodi/addons/plugin.video.silo/auth.py pair --profile-dir /storage/.kodi/userdata/addon_data/plugin.video.silo'
+ssh $SILO_SSH_OPTIONS "$SILO_SSH_TARGET" 'python3 /storage/.kodi/addons/plugin.video.silo.kodi/auth.py pair --profile-dir /storage/.kodi/userdata/addon_data/plugin.video.silo.kodi'
 ```
 
 Open the returned verification link and approve **Silo Kodi**. The output includes a QR image path if you prefer to copy the image to ignored local storage. It does not include tokens or the secret polling code. Leave the Kodi account screen closed during this headless check; closing that screen cancels its pending sign-in.
@@ -105,14 +105,14 @@ Open the returned verification link and approve **Silo Kodi**. The output includ
 Poll until the returned status is `approved`, respecting `poll_after` when present:
 
 ```sh
-ssh $SILO_SSH_OPTIONS "$SILO_SSH_TARGET" 'python3 /storage/.kodi/addons/plugin.video.silo/auth.py poll --profile-dir /storage/.kodi/userdata/addon_data/plugin.video.silo'
+ssh $SILO_SSH_OPTIONS "$SILO_SSH_TARGET" 'python3 /storage/.kodi/addons/plugin.video.silo.kodi/auth.py poll --profile-dir /storage/.kodi/userdata/addon_data/plugin.video.silo.kodi'
 ```
 
 Replace `poll` with `profiles` to list account profiles, then use `select --profile-id PROFILE_ID` to select one. For PIN entry, allocate an interactive SSH terminal with `-t`; the helper prompts without echoing the PIN. Use `verify` to make authenticated account, profile, and library requests, and `status` to inspect the persisted selection. These commands never print access or refresh tokens.
 
 Use `cancel` to cancel pending pairing. Use `logout` only when you intend to sign out of this installation. Redeploy and run `verify` again to check persistence. A new helper process verifies process-independent storage, but does not substitute for a separate Kodi restart acceptance test.
 
-For isolated workstation tests, run `python plugin.video.silo/auth.py configure --server "$SILO_SERVER_URL" --profile-dir .local-testing/test-account`, then use the same commands and directory. This creates a separate Silo device login and requires browser approval. It is not an authentication bypass.
+For isolated workstation tests, run `python plugin.video.silo.kodi/auth.py configure --server "$SILO_SERVER_URL" --profile-dir .local-testing/test-account`, then use the same commands and directory. This creates a separate Silo device login and requires browser approval. It is not an authentication bypass.
 
 Keep screenshots brief on OLED displays and return to the existing screensaver after visual checks. Decode a captured QR independently and exercise directional navigation, cancellation, and profile selection on Kodi; the headless helper alone cannot prove those UI behaviors.
 
@@ -121,7 +121,7 @@ Keep screenshots brief on OLED displays and return to the existing screensaver a
 Stop playback and leave the Silo directory first. Restore only this add-on, then rerun the directory check:
 
 ```sh
-ssh $SILO_SSH_OPTIONS "$SILO_SSH_TARGET" 'test -d /storage/.kodi/temp/silo-kodi-previous && rm -rf /storage/.kodi/addons/plugin.video.silo && mv /storage/.kodi/temp/silo-kodi-previous /storage/.kodi/addons/plugin.video.silo && kodi-send --action=UpdateLocalAddons'
+ssh $SILO_SSH_OPTIONS "$SILO_SSH_TARGET" 'test -d /storage/.kodi/temp/plugin.video.silo.kodi-previous && rm -rf /storage/.kodi/addons/plugin.video.silo.kodi && mv /storage/.kodi/temp/plugin.video.silo.kodi-previous /storage/.kodi/addons/plugin.video.silo.kodi && kodi-send --action=UpdateLocalAddons'
 python scripts/dev.py browse
 ```
 
@@ -168,7 +168,7 @@ After playback, verify Continue Watching reflects the server's updated progress.
 
 ## Account navigation and PIN acceptance
 
-Launch Silo from Kodi's video add-ons or through JSON-RPC `Addons.ExecuteAddon` with `addonid: plugin.video.silo`. The browser runs as a script; the root plugin route delegates to it after returning to Kodi Home. Closing Silo must return to Kodi instead of launching another browsing window. Playback remains on the `action=play` plugin route.
+Launch Silo from Kodi's video add-ons or through JSON-RPC `Addons.ExecuteAddon` with `addonid: plugin.video.silo.kodi`. The browser runs as a script; the root plugin route delegates to it after returning to Kodi Home. Closing Silo must return to Kodi instead of launching another browsing window. Playback remains on the `action=play` plugin route.
 
 Open **Account**, choose profiles, and select a PIN-protected test profile. Incorrect input must leave the original profile active. Correct input must open that profile's Home after closing Account, without retaining the original profile's Continue Watching rows. Switch back and verify the original rows return. Use Kodi's masked text entry: its numeric input ignores the hidden-input option, and Silo accepts nonnumeric PINs. Canceling the dialog must not submit a PIN attempt.
 

@@ -3,7 +3,7 @@ import sys
 import unittest
 from urllib.parse import parse_qs, urlsplit
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'plugin.video.silo/resources/lib'))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'plugin.video.silo.kodi/resources/lib'))
 from silo.catalog import Catalog, artwork
 from silo.client import Error
 

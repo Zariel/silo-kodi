@@ -11,7 +11,7 @@ python scripts/dev.py check
 python scripts/dev.py package
 ```
 
-The build writes `dist/plugin.video.silo-VERSION.zip` and a matching `.zip.sha256` file. `VERSION` comes from `plugin.video.silo/addon.xml`. Identical inputs produce identical ZIP bytes. A device upgrade check verifies byte-for-byte reproducibility, installed files against the archive, unchanged saved session data and permissions, and successful account access after deployment. Packaging includes only the add-on file allowlist; local credentials, test references, and source snapshots stay outside the archive.
+The build writes `dist/plugin.video.silo.kodi-VERSION.zip` and a matching `.zip.sha256` file. `VERSION` comes from `plugin.video.silo.kodi/addon.xml`. Identical inputs produce identical ZIP bytes. A device upgrade check verifies byte-for-byte reproducibility, installed files against the archive, unchanged saved session data and permissions, and successful account access after deployment. Packaging includes only the add-on file allowlist; local credentials, test references, and source snapshots stay outside the archive.
 
 ## Publish a GitHub Release
 

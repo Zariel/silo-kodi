@@ -12,7 +12,7 @@ from urllib.request import Request, urlopen
 from urllib.parse import urljoin
 from unittest.mock import patch
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'plugin.video.silo/resources/lib'))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'plugin.video.silo.kodi/resources/lib'))
 from silo.client import Error
 from silo.relay import MediaRelay
 

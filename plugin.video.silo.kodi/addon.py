@@ -47,7 +47,7 @@ def main():
         # RunAddon prefers the plugin extension even for a script/video add-on.
         # Leave its directory before launching the independent UI script.
         xbmc.executebuiltin('ActivateWindow(Home)', True)
-        xbmc.executebuiltin('RunScript(plugin.video.silo)')
+        xbmc.executebuiltin('RunScript(plugin.video.silo.kodi)')
         return
     # A window-owning script must not remain inside a directory request:
     # returning to that directory can invoke another browsing session.

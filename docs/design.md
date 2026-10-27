@@ -221,7 +221,7 @@ When a requested behavior is absent from the deployed Silo API, stop at a clear 
 
 Use the existing package/deploy workflow for local iteration: build the installable ZIP, transfer it over SSH, replace the add-on tree, and ask Kodi to rescan. Keep local endpoints and SSH configuration in ignored `.local-testing/`. Expand the package allowlist as XML windows, resources, and modules are added. Keep the same package builder for development and release artifacts.
 
-For GitHub Releases, add CI for syntax/manifest checks, focused contract tests, and packaging. A version tag should match `addon.xml`; a tag workflow builds `plugin.video.silo-<version>.zip` and a SHA-256 checksum, then attaches those artifacts and release notes to the release. The automatically generated repository source archive is not the installable add-on package. Begin with prereleases until real-device acceptance passes.
+For GitHub Releases, add CI for syntax/manifest checks, focused contract tests, and packaging. A version tag should match `addon.xml`; a tag workflow builds `plugin.video.silo.kodi-<version>.zip` and a SHA-256 checksum, then attaches those artifacts and release notes to the release. The automatically generated repository source archive is not the installable add-on package. Begin with prereleases until real-device acceptance passes.
 
 The first distribution method is Kodi's **Install from zip file**, with manual upgrades. A Kodi repository for automatic updates is a later feature; GitHub Releases alone does not provide Kodi's update feed. Do not add an updater inside the client. No publishing or release credentials are needed to develop locally.
 

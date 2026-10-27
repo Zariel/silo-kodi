@@ -129,7 +129,7 @@ class BrowserWindow(xbmcgui.WindowXML):
         selection = menu.getSelectedPosition()
         previous_resume = self.resume_index
         menu.reset()
-        media = Path(xbmcaddon.Addon('plugin.video.silo').getAddonInfo('path')) / 'resources/skins/Default/media'
+        media = Path(xbmcaddon.Addon('plugin.video.silo.kodi').getAddonInfo('path')) / 'resources/skins/Default/media'
 
         def add(label, icon):
             item = xbmcgui.ListItem(label)
@@ -777,7 +777,7 @@ class BrowserWindow(xbmcgui.WindowXML):
         if restart:
             query['restart'] = 'true'
         self._remember()
-        xbmc.Player().play('plugin://plugin.video.silo/?' + urlencode(query))
+        xbmc.Player().play('plugin://plugin.video.silo.kodi/?' + urlencode(query))
 
     def _video(self):
         if not active_playback(self.catalog.profile_id):
@@ -818,7 +818,7 @@ class BrowserWindow(xbmcgui.WindowXML):
                 self.account_requested = True
                 self.close()
             elif index == len(self.libraries) + 3 + int(self.resume_index is not None):
-                self._task(lambda: xbmcaddon.Addon('plugin.video.silo').openSettings())
+                self._task(lambda: xbmcaddon.Addon('plugin.video.silo.kodi').openSettings())
             else:
                 self.close()
         elif control in (230, 231):

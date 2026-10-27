@@ -93,9 +93,9 @@ def play(handle, session, profile_id, file_id, title, start_position=None, sourc
                 if attempt.intro:
                     import xbmcaddon
                     from .skip_intro import SkipIntro
-                    skip_intro = SkipIntro('SkipIntro.xml', xbmcaddon.Addon('plugin.video.silo').getAddonInfo('path'),
+                    skip_intro = SkipIntro('SkipIntro.xml', xbmcaddon.Addon('plugin.video.silo.kodi').getAddonInfo('path'),
                                            'Default', '1080i', segment=attempt.intro,
-                                           automatic=xbmcaddon.Addon('plugin.video.silo').getSettingBool('auto_skip_intro'))
+                                           automatic=xbmcaddon.Addon('plugin.video.silo.kodi').getSettingBool('auto_skip_intro'))
                 audio = SourceAudio(file_id, attempt.audio_tracks,
                                     lambda value: xbmc.convertLanguage(value, xbmc.ISO_639_2)) if attempt.audio_tracks else None
                 subtitles = SourceSubtitles(attempt.subtitle_tracks,

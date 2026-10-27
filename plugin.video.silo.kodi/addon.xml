@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<addon id="plugin.video.silo" name="Silo" version="0.3.0" provider-name="silo-kodi contributors">
+<addon id="plugin.video.silo.kodi" name="Silo for Kodi" version="0.3.0" provider-name="silo-kodi contributors">
   <requires>
     <import addon="xbmc.python" version="3.0.1" />
   </requires>

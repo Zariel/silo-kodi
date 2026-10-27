@@ -6,7 +6,7 @@ import unittest
 from unittest.mock import Mock, patch
 from urllib.parse import parse_qs, urlsplit
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'plugin.video.silo/resources/lib'))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'plugin.video.silo.kodi/resources/lib'))
 
 
 class Control:
@@ -72,7 +72,7 @@ class HomeNavigation(unittest.TestCase):
         modules['xbmcgui'] = SimpleNamespace(WindowXML=Window, ListItem=lambda label: Mock(label=label),
                                             getCurrentWindowId=lambda: 13000, getCurrentWindowDialogId=lambda: 9999)
         modules['silo.ui'] = SimpleNamespace(open_account=Mock(), _text=str)
-        path = Path(__file__).resolve().parents[1] / 'plugin.video.silo/resources/lib/silo/browser.py'
+        path = Path(__file__).resolve().parents[1] / 'plugin.video.silo.kodi/resources/lib/silo/browser.py'
         with patch.dict(sys.modules, modules):
             spec = importlib.util.spec_from_file_location('silo.browser_test', path)
             browser = importlib.util.module_from_spec(spec)

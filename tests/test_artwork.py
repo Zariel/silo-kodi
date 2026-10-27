@@ -13,7 +13,7 @@ class ArtworkPreload(unittest.TestCase):
         handle = Mock()
         handle.close.side_effect = done.set
         backend = Mock(return_value=handle)
-        path = Path(__file__).resolve().parents[1] / 'plugin.video.silo/resources/lib/silo/artwork.py'
+        path = Path(__file__).resolve().parents[1] / 'plugin.video.silo.kodi/resources/lib/silo/artwork.py'
         with patch.dict(sys.modules, {'xbmcvfs': SimpleNamespace(File=backend)}):
             spec = importlib.util.spec_from_file_location('silo_artwork_test', path)
             module = importlib.util.module_from_spec(spec)

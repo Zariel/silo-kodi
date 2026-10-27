@@ -6,12 +6,14 @@ Browse your Silo movies and TV shows and watch them in Kodi. Sign in with a QR c
 
 You need Kodi 21 or later, a Silo account, and the address of your Silo server.
 
-1. Download `plugin.video.silo-VERSION.zip` from [GitHub Releases](https://github.com/Zariel/silo-kodi/releases).
+1. Download `plugin.video.silo.kodi-VERSION.zip` from [GitHub Releases](https://github.com/Zariel/silo-kodi/releases).
 2. Copy the ZIP to a location Kodi can access.
 3. In Kodi, open **Settings → Add-ons → Install from zip file** and select the ZIP. If prompted, enable **Unknown sources** in Kodi's add-on settings.
 4. Open **Silo** from your add-ons.
 
 To update, download and install the replacement ZIP in the same way. Your saved sign-in is preserved.
+
+This add-on uses the ID `plugin.video.silo.kodi` and appears as **Silo for Kodi**. It can coexist with add-ons using other IDs. If you used an earlier build with the ID `plugin.video.silo`, install this ZIP as a separate add-on and sign in again. Settings and sign-in data are kept separate; installing it does not replace or modify the other add-on.
 
 ## Sign in
 

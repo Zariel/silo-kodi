@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <settings version="1">
-  <section id="plugin.video.silo">
+  <section id="plugin.video.silo.kodi">
     <category id="playback" label="32000" help="32004">
       <group id="1">
         <setting id="autoplay_next" type="boolean" label="32001" help="32005">

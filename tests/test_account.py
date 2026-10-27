@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock, patch
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'plugin.video.silo/resources/lib'))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'plugin.video.silo.kodi/resources/lib'))
 
 
 class ProfileEntry(unittest.TestCase):
@@ -15,7 +15,7 @@ class ProfileEntry(unittest.TestCase):
                               INPUT_ALPHANUM=0, ALPHANUM_HIDE_INPUT=1)
         modules = {name: Mock() for name in ('xbmc', 'xbmcaddon', 'xbmcvfs', 'silo.pairing')}
         modules['xbmcgui'] = gui
-        path = Path(__file__).resolve().parents[1] / 'plugin.video.silo/resources/lib/silo/ui.py'
+        path = Path(__file__).resolve().parents[1] / 'plugin.video.silo.kodi/resources/lib/silo/ui.py'
         with patch.dict(sys.modules, modules):
             spec = importlib.util.spec_from_file_location('silo.account_test', path)
             ui = importlib.util.module_from_spec(spec)

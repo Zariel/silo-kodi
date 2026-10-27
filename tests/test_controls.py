@@ -17,7 +17,7 @@ class Controls(unittest.TestCase):
         modules = {'xbmcgui': SimpleNamespace(Window=lambda _: window, Dialog=lambda: self.dialog),
                    'xbmc': SimpleNamespace(Player=lambda: SimpleNamespace(isPlaying=lambda: True, isPlayingVideo=lambda: True), executebuiltin=Mock())}
         spec = importlib.util.spec_from_file_location('controls_test', Path(__file__).resolve().parents[1] /
-                                                     'plugin.video.silo/resources/lib/silo/controls.py')
+                                                     'plugin.video.silo.kodi/resources/lib/silo/controls.py')
         self.module = importlib.util.module_from_spec(spec)
         with patch.dict(sys.modules, modules):
             spec.loader.exec_module(self.module)
@@ -91,6 +91,18 @@ class Controls(unittest.TestCase):
         self.module.playback_options()
         self.owner.close()
         self.assertEqual(self.properties, {})
+
+    def test_other_addon_playback_state_is_never_consumed_or_cleared(self):
+        legacy = {'silo.playback.state': json.dumps({'profile_id': 'viewer', 'content_id': 'other'}),
+                  'silo.playback.request': 'other request', 'silo.playback.completed': 'other completion'}
+        self.properties.update(legacy)
+        owner = self.module.PlaybackControls('viewer', 'ours')
+        self.assertIsNone(self.module.active_playback('viewer'))
+        self.assertIsNone(owner.take())
+        self.assertIsNone(self.module.take_completed('viewer'))
+        owner.publish(self.plan)
+        owner.close()
+        self.assertEqual(self.properties, legacy)
 
     def test_completion_is_profile_bound_and_consumed_once(self):
         owner = self.module.PlaybackControls('viewer', 'episode')

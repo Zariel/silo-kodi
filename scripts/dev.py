@@ -18,7 +18,7 @@ import xml.etree.ElementTree as ET
 import zipfile
 
 ROOT = Path(__file__).resolve().parent.parent
-ADDON = ROOT / "plugin.video.silo"
+ADDON = ROOT / "plugin.video.silo.kodi"
 ADDON_ID = ADDON.name
 
 
@@ -99,7 +99,7 @@ def deploy(args):
     idle(args)
     archive = package()
     digest = hashlib.sha256(archive.read_bytes()).hexdigest()
-    remote_zip = "/storage/.kodi/temp/silo-kodi-development.zip"
+    remote_zip = "/storage/.kodi/temp/plugin.video.silo.kodi-development.zip"
     ssh(args, "cat > " + shlex.quote(remote_zip), archive.read_bytes())
     # Back up the previous add-on and replace the whole tree to remove stale code.
     # User data is outside this tree. Registration uses Kodi, never its SQLite DB.
@@ -110,11 +110,11 @@ import shutil
 import tempfile
 import zipfile
 
-archive = Path("/storage/.kodi/temp/silo-kodi-development.zip")
+archive = Path("/storage/.kodi/temp/plugin.video.silo.kodi-development.zip")
 assert hashlib.sha256(archive.read_bytes()).hexdigest() == %r
 addons = Path("/storage/.kodi/addons")
-target = addons / "plugin.video.silo"
-backup = Path("/storage/.kodi/temp/silo-kodi-previous")
+target = addons / "plugin.video.silo.kodi"
+backup = Path("/storage/.kodi/temp/plugin.video.silo.kodi-previous")
 with tempfile.TemporaryDirectory(prefix="silo-kodi-", dir=addons) as stage:
     with zipfile.ZipFile(archive) as bundle:
         assert set(bundle.namelist()) == set(%r)
@@ -124,7 +124,7 @@ with tempfile.TemporaryDirectory(prefix="silo-kodi-", dir=addons) as stage:
             shutil.rmtree(backup)
         target.rename(backup)
     try:
-        (Path(stage) / "plugin.video.silo").rename(target)
+        (Path(stage) / "plugin.video.silo.kodi").rename(target)
     except BaseException:
         if backup.exists() and not target.exists():
             backup.rename(target)
@@ -147,7 +147,7 @@ print("Installed archive verified by SHA-256; previous build kept in Kodi temp")
     details = wait_for(addon_details, lambda value: value and value["enabled"] and value["version"] == expected)
     print(json.dumps(details, indent=2))
     if args.server:
-        command = 'python3 /storage/.kodi/addons/plugin.video.silo/auth.py configure --profile-dir /storage/.kodi/userdata/addon_data/plugin.video.silo --server ' + shlex.quote(args.server)
+        command = 'python3 /storage/.kodi/addons/plugin.video.silo.kodi/auth.py configure --profile-dir /storage/.kodi/userdata/addon_data/plugin.video.silo.kodi --server ' + shlex.quote(args.server)
         # Server configuration is explicit; credentials remain in the add-on's
         # private data directory and are preserved when the URL is unchanged.
         ssh(args, command)
@@ -156,7 +156,7 @@ print("Installed archive verified by SHA-256; previous build kept in Kodi temp")
 
 def browse(args):
     result = rpc(args, "Files.GetDirectory", {
-        "directory": "plugin://plugin.video.silo/?action=status", "media": "files",
+        "directory": "plugin://plugin.video.silo.kodi/?action=status", "media": "files",
     })
     labels = [item["label"] for item in result["files"]]
     assert "Silo connected — API v2" in labels, labels
@@ -204,9 +204,9 @@ def protect_idle_display(args):
     """Verify idle protection after a check; preserve replacement playback."""
     probe = """
 import sys
-sys.path.insert(0, '/storage/.kodi/addons/plugin.video.silo/resources/lib')
+sys.path.insert(0, '/storage/.kodi/addons/plugin.video.silo.kodi/resources/lib')
 from silo.client import Session, Error
-session = Session.open('/storage/.kodi/userdata/addon_data/plugin.video.silo')
+session = Session.open('/storage/.kodi/userdata/addon_data/plugin.video.silo.kodi')
 try:
     with session.store.playback_lock(): print('released')
 except Error as exc:
@@ -269,9 +269,9 @@ def smoke(args):
     idle(args)
     profile = json.loads(remote_python(args, """
 import json, sys
-sys.path.insert(0, '/storage/.kodi/addons/plugin.video.silo/resources/lib')
+sys.path.insert(0, '/storage/.kodi/addons/plugin.video.silo.kodi/resources/lib')
 from silo.client import Session
-session = Session.open('/storage/.kodi/userdata/addon_data/plugin.video.silo')
+session = Session.open('/storage/.kodi/userdata/addon_data/plugin.video.silo.kodi')
 print(json.dumps(session.status().get('profile') if session else None))
 """))
     if not profile:
@@ -282,7 +282,7 @@ print(json.dumps(session.status().get('profile') if session else None))
         'title': label, 'restart': 'true'}
     if args.content_id:
         query['content'] = args.content_id
-    route = 'plugin://plugin.video.silo/?' + urlencode(query)
+    route = 'plugin://plugin.video.silo.kodi/?' + urlencode(query)
 
     def owned_player():
         for active in rpc(args, "Player.GetActivePlayers"):

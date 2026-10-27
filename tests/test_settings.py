@@ -10,7 +10,7 @@ class Settings(unittest.TestCase):
     def test_autoplay_is_opt_in_and_delay_is_bounded(self):
         values = {'enabled': False, 'delay': 10}
         addon = SimpleNamespace(getSettingBool=lambda _: values['enabled'], getSettingInt=lambda _: values['delay'])
-        path = Path(__file__).resolve().parents[1] / 'plugin.video.silo/resources/lib/silo/settings.py'
+        path = Path(__file__).resolve().parents[1] / 'plugin.video.silo.kodi/resources/lib/silo/settings.py'
         spec = importlib.util.spec_from_file_location('settings_test', path)
         module = importlib.util.module_from_spec(spec)
         with patch.dict(sys.modules, {'xbmcaddon': SimpleNamespace(Addon=lambda _: addon)}):

@@ -3,7 +3,7 @@ import sys
 import unittest
 import xml.etree.ElementTree as ET
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'plugin.video.silo/resources/lib'))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'plugin.video.silo.kodi/resources/lib'))
 from silo.layout import _BrowserLayout
 
 
@@ -55,7 +55,7 @@ class Window:
 
 class BrowserLayout(unittest.TestCase):
     def test_playback_overlay_leaves_room_and_preserves_selection(self):
-        path = Path(__file__).resolve().parents[1] / 'plugin.video.silo/resources/skins/Default/1080i/Browser.xml'
+        path = Path(__file__).resolve().parents[1] / 'plugin.video.silo.kodi/resources/skins/Default/1080i/Browser.xml'
         window = Window(ET.parse(path).getroot())
         layout = _BrowserLayout(window)
         for identifier in (200, 220):
@@ -72,7 +72,7 @@ class BrowserLayout(unittest.TestCase):
         self.assertEqual(window.getControl(220).selection, 24)
 
     def test_content_fits_beside_sidebar_in_both_states(self):
-        path = Path(__file__).resolve().parents[1] / 'plugin.video.silo/resources/skins/Default/1080i/Browser.xml'
+        path = Path(__file__).resolve().parents[1] / 'plugin.video.silo.kodi/resources/skins/Default/1080i/Browser.xml'
         root = ET.parse(path).getroot()
         window = Window(root)
         layout = _BrowserLayout(window)

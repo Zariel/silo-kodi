@@ -38,7 +38,7 @@ class Countdown(unittest.TestCase):
                 if invalidate:
                     state.valid = False
 
-        path = Path(__file__).resolve().parents[1] / 'plugin.video.silo/resources/lib/silo/next_episode.py'
+        path = Path(__file__).resolve().parents[1] / 'plugin.video.silo.kodi/resources/lib/silo/next_episode.py'
         spec = importlib.util.spec_from_file_location('next_episode_test', path)
         module = importlib.util.module_from_spec(spec)
         modules = {'xbmc': SimpleNamespace(Monitor=Monitor), 'xbmcgui': SimpleNamespace(WindowXMLDialog=Dialog),
