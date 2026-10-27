@@ -2,7 +2,6 @@
 from pathlib import Path
 import re
 import threading
-import time
 from urllib.parse import urlencode
 
 import xbmc
@@ -449,9 +448,7 @@ class BrowserWindow(xbmcgui.WindowXML):
         for identifier in ((200, 210, 220) if kind == 'home' else (200, 210, 220, 230, 231, 232)):
             self.getControl(identifier).reset()
         self.getControl(300).setVisible(False)
-        self.getControl(301).setVisible(kind in ('item', 'season'))
         self.getControl(302).setVisible(kind == 'item')
-        self.getControl(304).setVisible(bool(page.get('next_episode')))
         parent = kind == 'season' or (kind == 'item' and page['data'].get('type') == 'episode'
                                      and page['data'].get('series_id')
                                      and page['data'].get('season_number') is not None)
@@ -477,10 +474,6 @@ class BrowserWindow(xbmcgui.WindowXML):
                 self.getControl(identifier).setLabel(_text(labels[key]))
             if kind == 'season' or data['type'] == 'series':
                 self.getControl(24).setLabel('Episodes' if kind == 'season' else 'Seasons')
-            elif page.get('next_episode'):
-                following = page['next_episode']
-                self.getControl(24).setLabel(_text('Next: S{} E{} · {}'.format(
-                    following.get('season_number', ''), following['episode_number'], following.get('title') or 'Episode')))
             self.getControl(22).setText(_text(data.get('overview') or ''))
             if kind == 'season':
                 control_id = 220
@@ -506,19 +499,20 @@ class BrowserWindow(xbmcgui.WindowXML):
         control = self.getControl(control_id)
         control.selectItem(page.get('selection', 0))
         playable = kind == 'item' and page['data']['type'] in ('movie', 'episode')
-        focus = page.get('focus', 300 if playable else control_id if control.size() else 301 if kind in ('item', 'season') else 100)
+        actions = ([300] if playable else []) + ([302] if kind == 'item' else [])
+        actions += [303] if parent else []
+        destination = 300 if playable else control_id if control.size() else actions[0] if actions else 100
+        focus = page.get('focus', destination)
         if self.keep_sidebar_focus:
             focus = 100
         self._restore_focus(page, focus)
-        destination = 300 if playable else control_id if control.size() else 301 if kind in ('item', 'season') else 100
         self.getControl(100).controlRight(self.getControl(destination))
-        if kind in ('item', 'season'):
-            actions = ([300] if playable else []) + ([304] if page.get('next_episode') else [])
-            actions += [302] if kind == 'item' else []
-            actions += ([303] if parent else []) + [301]
+        if actions:
+            left = 64
             for index, identifier in enumerate(actions):
                 button = self.getControl(identifier)
-                button.setPosition(64 + index * 260, 490)
+                button.setPosition(left, 490)
+                left += button.getWidth() + 14
                 button.controlLeft(self.getControl(actions[index - 1] if index else 100))
                 button.controlRight(self.getControl(actions[index + 1] if index + 1 < len(actions) else identifier))
                 button.controlUp(self.getControl(100))
@@ -533,41 +527,8 @@ class BrowserWindow(xbmcgui.WindowXML):
         if data.get('type') not in ('movie', 'series', 'episode'):
             raise Error('invalid_response')
         seasons = self.catalog.seasons(content_id) if data['type'] == 'series' else []
-        following = None
-        if data['type'] == 'episode':
-            try:
-                following = self.catalog.next_episode(data)
-            except Error:
-                xbmc.log('Silo: next episode is temporarily unavailable', xbmc.LOGWARNING)
         self._push({'kind': 'item', 'title': data.get('title') or 'Untitled', 'data': data,
-                    'items': seasons, 'next_episode': following})
-
-    def _play_next(self):
-        following = self.page.get('next_episode')
-        if not following:
-            return
-        player = xbmc.Player()
-        if player.isPlaying():
-            playing = active_playback(self.catalog.profile_id)
-            if not playing or playing.get('content_id') != self.page['data']['content_id']:
-                raise Error('playback_active')
-            player.stop()
-        # The previous owner holds this lock until its final progress/stop report completes.
-        deadline = time.monotonic() + 35
-        monitor = xbmc.Monitor()
-        while not self.closed.is_set():
-            try:
-                with self.session.store.playback_lock():
-                    break
-            except Error as exc:
-                if exc.code != 'playback_active' or time.monotonic() >= deadline:
-                    raise
-                if monitor.waitForAbort(.1):
-                    return
-        if self.closed.is_set():
-            return
-        self._detail(following['content_id'])
-        self._play()
+                    'items': seasons})
 
     def _season(self, season, series=None, episode_id=None):
         series = series if series is not None else self.page['data']
@@ -846,16 +807,12 @@ class BrowserWindow(xbmcgui.WindowXML):
             if index >= 0:
                 content_id = self.page['items'][index]['content_id']
                 self._task(lambda: self._detail(content_id))
-        elif control == 301:
-            self._back()
         elif control == 300:
             self._task(self._play)
         elif control == 302:
             self._task(self._context)
         elif control == 303:
             self._task(self._parent)
-        elif control == 304:
-            self._task(self._play_next)
 
     def onFocus(self, control_id):
         if control_id not in range(500, 506):

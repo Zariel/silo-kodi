@@ -44,7 +44,7 @@ Marking a TV show watched or unwatched applies to all its episodes. Removing an 
 
 Choose **Play** on a movie or episode. If Silo has saved your progress, you can resume or start from the beginning. Use Kodi's playback controls to pause, seek, and select an audio track.
 
-Episode lists show watched ticks and saved viewing progress. Choose **Play next** on an episode's details to move to the following available episode. By default, finishing an episode offers a choice to play the next one or return to browsing.
+Episode lists show watched ticks and saved viewing progress. By default, finishing an episode offers a choice to play the next one or return to browsing.
 
 When Silo provides an intro marker for your selected video, **Skip intro** appears during the intro. Select it to skip, or press Back to dismiss it.
 

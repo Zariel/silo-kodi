@@ -32,6 +32,9 @@ class Control:
     def getSelectedPosition(self):
         return self.position
 
+    def getWidth(self):
+        return 160
+
     def size(self):
         return len(self.items)
 
@@ -105,6 +108,23 @@ class HomeNavigation(unittest.TestCase):
                                   'user_data': {'position_seconds': 90, 'duration_seconds': 360}})
         card.setProperty.assert_any_call('watch_status', '25% watched')
 
+    def test_empty_show_and_season_keep_remote_navigation(self):
+        self.library()
+        self.catalog.item.side_effect = None
+        self.catalog.item.return_value = dict(self.card('show'), type='series')
+        self.catalog.seasons.return_value = []
+        self.catalog.episodes.return_value = []
+        self.window._detail('show')
+        self.assertEqual(self.window.getFocusId(), 302)
+        self.window._season({'season_number': 1})
+        self.assertEqual(self.window.getFocusId(), 303)
+        self.window.onAction(SimpleNamespace(getId=lambda: 92))
+        self.assertEqual(self.window.page['kind'], 'item')
+        self.assertEqual(self.window.getFocusId(), 302)
+        self.window.onAction(SimpleNamespace(getId=lambda: 92))
+        self.assertEqual(self.window.page['kind'], 'library')
+        self.assertEqual(self.window.getFocusId(), 200)
+
     def test_completion_requires_explicit_choice(self):
         globals_ = self.window._offer_next.__globals__
         globals_['xbmc'].Player.return_value.isPlaying.return_value = False
@@ -121,16 +141,6 @@ class HomeNavigation(unittest.TestCase):
             self.window._offer_next('episode')
         self.window._detail.assert_called_once_with('next')
         self.window._play.assert_called_once_with()
-
-    def test_play_next_cannot_stop_another_video(self):
-        globals_ = self.window._play_next.__globals__
-        self.window.page = {'data': {'content_id': 'episode'}, 'next_episode': {'content_id': 'next'}}
-        player = globals_['xbmc'].Player.return_value
-        player.isPlaying.return_value = True
-        globals_['active_playback'].return_value = {'content_id': 'another'}
-        with self.assertRaises(globals_['Error']):
-            self.window._play_next()
-        player.stop.assert_not_called()
 
     def test_autoplay_preserves_resume_without_interactive_choices(self):
         globals_ = self.window._play.__globals__
@@ -638,7 +648,7 @@ class HomeNavigation(unittest.TestCase):
         self.open_home()
         self.window.onClick(230)
         self.catalog.item.reset_mock()
-        for focus in (100, 301, 210):
+        for focus in (100, 303, 210):
             self.window.setFocusId(focus)
             self.window.onAction(SimpleNamespace(getId=lambda: 117))
         self.catalog.item.assert_not_called()

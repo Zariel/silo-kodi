@@ -102,7 +102,7 @@ class BrowserLayout(unittest.TestCase):
                             self.assertLessEqual(float(child.findtext('left', '0')) + float(child.findtext('width', '0')),
                                                  float(row.attrib['width']))
                 self.assertEqual(window.getControl(200).selection, 17)
-                self.assertEqual(window.getControl(300).width, 240)
+                self.assertEqual(window.getControl(300).width, 160)
                 self.assertEqual(window.getControl(200).width, 1424 if expanded else 1664)
                 self.assertEqual(window.properties['sidebar_expanded'], str(expanded).lower())
                 if not expanded:
