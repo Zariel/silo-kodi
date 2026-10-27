@@ -4,14 +4,16 @@
 class _BrowserLayout:
     # These controls fill the content region. Posters and buttons keep their
     # intrinsic sizes; lists let Kodi derive the number of visible cards.
-    _FILL = (12, 20, 21, 22, 23, 24, 25, 26, 27, 30, 32, 40, 41, 42, 200, 210, 220, 230, 231, 232)
-    _LISTS = (100, 200, 210, 220, 230, 231, 232)
+    _FILL = (12, 20, 21, 22, 23, 24, 25, 26, 27, 30, 32, 200, 210, 220)
+    _LISTS = (100, 200, 210, 220)
     _COMPACT = 120
     _EXPANDED = 360
 
-    def __init__(self, window):
+    def __init__(self, window, shelves=()):
         self.window = window
-        self.widths = {identifier: window.getControl(identifier).getWidth() for identifier in self._FILL}
+        self.lists = self._LISTS + tuple(shelves)
+        fill = self._FILL + tuple(identifier + offset for identifier in shelves for offset in (0, 1))
+        self.widths = {identifier: window.getControl(identifier).getWidth() for identifier in fill}
 
     def apply(self, expanded, force=False):
         window = self.window
@@ -20,8 +22,7 @@ class _BrowserLayout:
         if not force and window.getControl(400).getPosition()[0] == inset:
             return
         selections = {identifier: window.getControl(identifier).getSelectedPosition()
-                      for identifier in self._LISTS if window.getControl(identifier).size()}
-        inset = self._EXPANDED if expanded else self._COMPACT
+                      for identifier in self.lists if window.getControl(identifier).size()}
         difference = inset - self._COMPACT
         # Shrink/move content before showing the expanded menu; hide the menu
         # before growing content. Intermediate frames cannot overlap either.

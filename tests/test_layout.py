@@ -9,6 +9,7 @@ from silo.layout import _BrowserLayout
 
 class Control:
     def __init__(self, element):
+        self.kind = element.attrib.get('type')
         self.x = float(element.findtext('left', '0'))
         self.y = float(element.findtext('top', '0'))
         self.width = float(element.findtext('width', '0'))
@@ -50,7 +51,10 @@ class Window:
         self.properties = {}
 
     def getControl(self, identifier):
-        return self.controls[identifier]
+        control = self.controls[identifier]
+        if control.kind == 'grouplist':
+            raise RuntimeError('Unknown control type for python')
+        return control
 
     def setProperty(self, key, value):
         self.properties[key] = value
@@ -98,7 +102,7 @@ class BrowserLayout(unittest.TestCase):
         window.getControl(200).selection = 17
         content = root.find("./controls/control[@id='400']")
         original = {int(node.attrib['id']): float(node.findtext('width'))
-                    for node in content.findall('control')}
+                    for node in content.findall('control') if node.attrib.get('type') != 'grouplist'}
 
         for expanded, boundary in ((True, 360), (False, 120), (True, 360), (False, 120)):
             layout.apply(expanded)

@@ -29,6 +29,9 @@ class Control:
     def selectItem(self, position):
         self.position = position
 
+    def getListItem(self, position):
+        return self.items[position]
+
     def getSelectedPosition(self):
         return self.position
 
@@ -83,7 +86,7 @@ class HomeNavigation(unittest.TestCase):
         browser.autoplay_delay = Mock(return_value=None)
         session = Mock(server='https://silo.example.test')
         session.status.return_value = {'profile': {'id': 'viewer', 'name': 'Viewer'}}
-        self.window = browser.BrowserWindow(session=session)
+        self.window = browser.BrowserWindow(session=session, home_sections=[])
         self.window.window_id = 13000
         self.window._task = lambda operation: operation()
         self.catalog = Mock(profile_id='viewer')
@@ -95,6 +98,8 @@ class HomeNavigation(unittest.TestCase):
             'last': {'id': 'last', 'title': 'Last', 'items': [self.card('c')]},
         }
         self.catalog.home.return_value = [{'id': key} for key in self.rows]
+        self.window.home_sections = self.catalog.home.return_value
+        self.window.home_controls = (1000, 1003, 1006)
         self.catalog.home_section.side_effect = lambda key: self.rows[key]
         self.catalog.home_content.side_effect = lambda sections: [self.catalog.home_section(row['id']) for row in sections]
         self.catalog.item.side_effect = lambda key, **kwargs: dict(self.card(key), title=key)
@@ -160,23 +165,35 @@ class HomeNavigation(unittest.TestCase):
         self.assertNotIn('restart', query)
 
     def open_home(self):
+        self.window.home_sections = self.catalog.home.return_value
         self.window.getControl(100).selectItem(0)
         self.window.onClick(100)
         self.window.onAction(SimpleNamespace(getId=lambda: 2))
 
     def test_return_refreshes_rows_and_preserves_card_identity(self):
         self.open_home()
-        self.assertEqual(self.window.getControl(40).label, 'First')
-        self.assertEqual(self.window.getControl(41).label, 'Last')
-        self.window.getControl(230).selectItem(1)
-        self.window.onClick(230)
+        self.assertEqual(self.window.getControl(1001).label, 'First')
+        self.assertEqual(self.window.getControl(1004).label, 'Last')
+        self.window.getControl(1000).selectItem(1)
+        self.window.onClick(1000)
         self.assertEqual(self.window.getControl(12).label, 'b')
 
         self.rows['first']['items'] = [self.card('b'), self.card('a')]
         self.window.onAction(SimpleNamespace(getId=lambda: 10))
         self.assertEqual(self.window.getControl(12).label, 'Home')
-        self.assertEqual(self.window.getFocusId(), 230)
-        self.assertEqual(self.window.getControl(230).getSelectedPosition(), 0)
+        self.assertEqual(self.window.getFocusId(), 1000)
+        self.assertEqual(self.window.getControl(1000).getSelectedPosition(), 0)
+
+    def test_return_keeps_selected_shelf_when_an_earlier_shelf_disappears(self):
+        self.rows['third'] = {'id': 'third', 'title': 'Third', 'items': [self.card('d')]}
+        self.catalog.home.return_value = [{'id': key} for key in self.rows]
+        self.open_home()
+        self.window.setFocusId(1003)
+        self.window.onClick(1003)
+        self.rows['first']['items'] = []
+        self.window.onAction(SimpleNamespace(getId=lambda: 10))
+        self.assertEqual(self.window.getFocusId(), 1000)
+        self.assertEqual(self.window._selected()['content_id'], 'c')
 
     def test_empty_home_keeps_navigation_available(self):
         self.rows = {}
@@ -187,16 +204,16 @@ class HomeNavigation(unittest.TestCase):
 
     def test_removed_selected_card_returns_to_first_available_card(self):
         self.open_home()
-        self.window.getControl(230).selectItem(1)
-        self.window.onClick(230)
+        self.window.getControl(1000).selectItem(1)
+        self.window.onClick(1000)
         self.rows['first']['items'] = [self.card('a')]
         self.window.onAction(SimpleNamespace(getId=lambda: 10))
-        self.assertEqual(self.window.getControl(230).getSelectedPosition(), 0)
-        self.assertEqual(self.window.getFocusId(), 230)
+        self.assertEqual(self.window.getControl(1000).getSelectedPosition(), 0)
+        self.assertEqual(self.window.getFocusId(), 1000)
 
     def test_watch_choices_start_selected_version_with_resume_or_restart(self):
         self.open_home()
-        self.window.onClick(230)
+        self.window.onClick(1000)
         globals_ = self.window.onClick.__globals__
         player = globals_['xbmc'].Player.return_value
         player.isPlaying.return_value = False
@@ -222,7 +239,7 @@ class HomeNavigation(unittest.TestCase):
 
     def test_cancel_watch_choice_does_not_start_playback(self):
         self.open_home()
-        self.window.onClick(230)
+        self.window.onClick(1000)
         globals_ = self.window.onClick.__globals__
         player = globals_['xbmc'].Player.return_value
         player.isPlaying.return_value = False
@@ -263,6 +280,62 @@ class HomeNavigation(unittest.TestCase):
         self.window._back()
         self.assertEqual(control.position, 40)
         self.assertEqual(control.size(), 101)
+
+    def test_exact_count_paging_keeps_native_cards_and_selection_alive(self):
+        self.catalog.page.return_value = {'items': [self.card(str(i)) for i in range(50)],
+                                          'next_cursor': 'next', 'total': 100}
+        self.window._library({'id': 'movies', 'name': 'Movies'})
+        control = self.window.getControl(200)
+        self.assertEqual(control.size(), 100)
+        original = list(control.items)
+        control.selectItem(40)
+
+        def fetch(*args):
+            # A remote input arrives while the next page is in flight.
+            control.selectItem(48)
+            return {'items': [self.card(str(i)) for i in range(50, 100)], 'next_cursor': None}
+        self.catalog.page.side_effect = fetch
+        with patch.object(control, 'reset', side_effect=AssertionError('destroying the native viewport')), \
+                patch.object(control, 'addItems', side_effect=AssertionError('rebinding the native viewport')):
+            self.window._prefetch()
+        self.assertEqual(control.position, 48)
+        self.assertEqual(control.items, original)
+        control.items[50].setLabel.assert_called_once_with('50')
+        control.items[99].setLabel.assert_called_once_with('99')
+        self.window.onClick(200)
+        self.assertEqual(self.window.page['data']['content_id'], '48')
+
+    def test_search_and_section_grids_share_stable_paging(self):
+        for kind in ('search', 'section'):
+            with self.subTest(kind=kind):
+                page = {'kind': kind, 'title': 'Results', 'query': 'term', 'section': 'recent',
+                        'items': [self.card(str(i)) for i in range(50)], 'total': 100, 'next_cursor': 'next'}
+                self.window._show(page)
+                control = self.window.getControl(200)
+                original = list(control.items)
+                control.selectItem(30)
+                result = {'items': [self.card(str(i)) for i in range(50, 100)], 'next_cursor': None}
+                self.catalog.search.return_value = result
+                self.catalog.home_page.return_value = result
+                self.window._prefetch()
+                self.assertEqual(control.items, original)
+                self.assertEqual(control.position, 30)
+                control.items[99].setLabel.assert_called_once_with('99')
+
+    def test_changed_count_does_not_leave_empty_or_inaccessible_cards(self):
+        for total in (60, 120):
+            with self.subTest(total=total):
+                self.catalog.page.return_value = {'items': [self.card(str(i)) for i in range(50)],
+                                                  'next_cursor': 'next', 'total': total}
+                self.window._library({'id': 'movies', 'name': 'Movies'})
+                control = self.window.getControl(200)
+                control.selectItem(48)
+                self.catalog.page.return_value = {
+                    'items': [self.card(str(i)) for i in range(50, 100)], 'next_cursor': None}
+                self.window._prefetch()
+                self.assertEqual(control.size(), 100)
+                self.assertEqual(control.position, 48)
+                self.assertEqual([item.label for item in control.items], [str(i) for i in range(100)])
 
     def test_paging_discards_result_after_navigation_or_close(self):
         for transition in (self.open_home, self.window.closed.set):
@@ -441,7 +514,7 @@ class HomeNavigation(unittest.TestCase):
             with self.subTest(home=home):
                 if home:
                     self.open_home()
-                    origin_focus = 230
+                    origin_focus = 1000
                 else:
                     self.library()
                     self.window.onClick(200)
@@ -603,8 +676,8 @@ class HomeNavigation(unittest.TestCase):
         with patch.object(globals_['xbmcgui'], 'Dialog', return_value=dialog, create=True):
             self.window.onAction(SimpleNamespace(getId=lambda: 117))
         self.catalog.dismiss_home.assert_called_once_with('a', 'continue_watching', '2026-10-24T10:00:00Z')
-        self.assertEqual(self.window.getControl(230).items[0].label, 'b')
-        self.assertEqual(self.window.getFocusId(), 230)
+        self.assertEqual(self.window.getControl(1000).items[0].label, 'b')
+        self.assertEqual(self.window.getFocusId(), 1000)
         self.catalog.set_state.assert_not_called()
 
     def test_next_up_removal_discards_inflight_page(self):
@@ -646,7 +719,7 @@ class HomeNavigation(unittest.TestCase):
 
     def test_sidebar_and_season_cards_do_not_target_detail_title(self):
         self.open_home()
-        self.window.onClick(230)
+        self.window.onClick(1000)
         self.catalog.item.reset_mock()
         for focus in (100, 303, 210):
             self.window.setFocusId(focus)
@@ -655,18 +728,18 @@ class HomeNavigation(unittest.TestCase):
 
     def test_home_keeps_shelves_visible_during_row_fetch(self):
         self.open_home()
-        self.window.setFocusId(231)
-        before = [item.label for item in self.window.getControl(231).items]
+        self.window.setFocusId(1003)
+        before = [item.label for item in self.window.getControl(1003).items]
 
         def fetch(key):
-            self.assertEqual([item.label for item in self.window.getControl(231).items], before)
-            self.assertEqual(self.window.getFocusId(), 231)
+            self.assertEqual([item.label for item in self.window.getControl(1003).items], before)
+            self.assertEqual(self.window.getFocusId(), 1003)
             return self.rows[key]
 
         self.catalog.home_section.side_effect = fetch
-        self.window.page['focus'] = 231
+        self.window.page['focus'] = 1003
         self.window._show(self.window.page)
-        self.assertEqual(self.window.getFocusId(), 231)
+        self.assertEqual(self.window.getFocusId(), 1003)
 
     def test_home_completion_respects_explicit_left_during_load(self):
         def fetch(key):
@@ -679,17 +752,17 @@ class HomeNavigation(unittest.TestCase):
         self.catalog.home_section.side_effect = fetch
         self.window.onClick(100)
         self.assertEqual(self.window.getFocusId(), 100)
-        self.assertEqual(self.window.getControl(230).items[0].label, 'a')
+        self.assertEqual(self.window.getControl(1000).items[0].label, 'a')
 
     def test_failed_home_refresh_preserves_visible_shelves(self):
         self.open_home()
-        self.window.setFocusId(231)
-        before = [item.label for item in self.window.getControl(231).items]
+        self.window.setFocusId(1003)
+        before = [item.label for item in self.window.getControl(1003).items]
         self.catalog.home_section.side_effect = RuntimeError('offline')
         with self.assertRaises(RuntimeError):
             self.window._show(self.window.page)
-        self.assertEqual([item.label for item in self.window.getControl(231).items], before)
-        self.assertEqual(self.window.getFocusId(), 231)
+        self.assertEqual([item.label for item in self.window.getControl(1003).items], before)
+        self.assertEqual(self.window.getFocusId(), 1003)
 
     def test_library_completion_respects_sidebar_navigation(self):
         def fetch(*args):
@@ -712,7 +785,7 @@ class HomeNavigation(unittest.TestCase):
                 self.window.onClick(100)
                 self.assertEqual(self.window.getFocusId(), 100)
                 self.window.onAction(SimpleNamespace(getId=lambda: direction))
-                self.assertEqual(self.window.getFocusId(), 230)
+                self.assertEqual(self.window.getFocusId(), 1000)
 
     def test_left_claims_sidebar_for_normal_navigation(self):
         self.window.onClick(100)
@@ -729,35 +802,39 @@ class HomeNavigation(unittest.TestCase):
 
         self.catalog.home_section.side_effect = fetch
         self.window.onClick(100)
-        self.assertEqual(self.window.getFocusId(), 230)
+        self.assertEqual(self.window.getFocusId(), 1000)
 
     def test_home_preview_becomes_next_shelf_without_skipping_empty_rows(self):
         self.rows['third'] = {'id': 'third', 'title': 'Third', 'items': [self.card('d')]}
         self.catalog.home.return_value = [{'id': key} for key in self.rows]
         self.open_home()
-        self.assertEqual(self.window.getControl(42).label, 'Third')
-        self.assertEqual(self.window.getControl(232).items[0].label, 'd')
+        self.assertEqual(self.window.getControl(1007).label, 'Third')
+        self.assertEqual(self.window.getControl(1006).items[0].label, 'd')
 
+        # Kodi owns the vertical cursor; Python must not replace these shelves.
+        rows = [self.window.getControl(identifier) for identifier in (1000, 1003, 1006)]
+        before = [list(row.items) for row in rows]
+        for row in rows:
+            row.reset = Mock(side_effect=AssertionError('rebinding while scrolling'))
+            row.addItems = Mock(side_effect=AssertionError('rebinding while scrolling'))
+        self.window.setFocusId(1003)
         self.window.onAction(SimpleNamespace(getId=lambda: 4))
-        self.window.onAction(SimpleNamespace(getId=lambda: 4))
-        self.assertEqual(self.window.getControl(41).label, 'Third')
-        self.assertEqual(self.window.getControl(231).items[0].label, 'd')
-        self.assertEqual(self.window.getFocusId(), 231)
-        self.assertEqual(self.window.getControl(42).label, '')
-        self.assertEqual(self.window.getControl(232).items, [])
+        self.window.setFocusId(1006)
+        self.window.onAction(SimpleNamespace(getId=lambda: 3))
+        self.assertEqual([row.items for row in rows], before)
 
     def test_home_does_not_preview_empty_remaining_shelves(self):
         self.rows['trailing-empty'] = {'id': 'trailing-empty', 'title': 'Empty', 'items': []}
         self.catalog.home.return_value = [{'id': key} for key in self.rows]
         self.open_home()
-        self.assertEqual(self.window.getControl(42).label, '')
-        self.assertEqual(self.window.getControl(232).items, [])
+        self.assertEqual(self.window.getControl(1007).label, '')
+        self.assertEqual(self.window.getControl(1006).items, [])
 
     def test_home_horizontal_paging_appends_without_view_all_or_focus_change(self):
         self.rows['first'].update(section_type='continue_watching',
                                   items=[self.card(str(i)) for i in range(50)], next_cursor='next')
         self.open_home()
-        control = self.window.getControl(230)
+        control = self.window.getControl(1000)
         self.assertEqual(control.size(), 50)
         control.selectItem(12)
         self.catalog.home_page.return_value = {
@@ -765,7 +842,7 @@ class HomeNavigation(unittest.TestCase):
         self.window._prefetch()
         self.assertEqual([item.label for item in control.items], [str(i) for i in range(100)])
         self.assertEqual(control.position, 12)
-        self.assertEqual(self.window.getFocusId(), 230)
+        self.assertEqual(self.window.getFocusId(), 1000)
         self.catalog.home_page.assert_called_once_with('first', 'next')
 
     def test_home_discards_paging_for_a_replaced_shelf(self):
@@ -777,7 +854,7 @@ class HomeNavigation(unittest.TestCase):
             return {'items': [self.card('stale')], 'next_cursor': None}
         self.catalog.home_page.side_effect = fetch
         self.window._prefetch()
-        self.assertEqual([item.label for item in self.window.getControl(230).items], ['replacement'])
+        self.assertEqual([item.label for item in self.window.getControl(1000).items], ['replacement'])
 
     def test_home_vertical_scrolling_uses_preloaded_shelves(self):
         self.rows['third'] = {'id': 'third', 'title': 'Third', 'items': [self.card('d')]}
@@ -797,13 +874,13 @@ class HomeNavigation(unittest.TestCase):
         self.catalog.home_page.return_value = {
             'items': [self.card(str(i)) for i in range(50, 100)], 'next_cursor': None}
         self.window._prefetch()
-        self.window.getControl(230).selectItem(75)
-        self.window.onClick(230)
+        self.window.getControl(1000).selectItem(75)
+        self.window.onClick(1000)
         self.rows['first'] = dict(self.rows['first'], items=[self.card(str(i)) for i in range(50)], next_cursor='next')
         self.window.onAction(SimpleNamespace(getId=lambda: 10))
-        control = self.window.getControl(230)
+        control = self.window.getControl(1000)
         self.assertEqual(control.items[control.position].label, '75')
-        self.assertEqual(self.window.getFocusId(), 230)
+        self.assertEqual(self.window.getFocusId(), 1000)
 
     def test_home_discards_error_from_a_replaced_shelf(self):
         self.rows['first'].update(section_type='continue_watching', next_cursor='next')
@@ -815,18 +892,19 @@ class HomeNavigation(unittest.TestCase):
         self.catalog.home_page.side_effect = fetch
         self.window._prefetch()
         self.assertEqual(self.window.getControl(20).label, '')
-        self.assertEqual([item.label for item in self.window.getControl(230).items], ['replacement'])
+        self.assertEqual([item.label for item in self.window.getControl(1000).items], ['replacement'])
 
-    def test_home_paging_does_not_append_to_a_reassigned_shelf_control(self):
+    def test_home_paging_keeps_shelf_identity_during_vertical_navigation(self):
         self.rows['last'].update(section_type='continue_watching', next_cursor='next')
         self.rows['third'] = {'id': 'third', 'title': 'Third', 'items': [self.card('d')]}
         self.catalog.home.return_value = [{'id': key} for key in self.rows]
         self.open_home()
         def fetch(*args):
-            self.window.setFocusId(231)
+            self.window.setFocusId(1003)
             self.window.onAction(SimpleNamespace(getId=lambda: 4))
             return {'items': [self.card('later')], 'next_cursor': None}
         self.catalog.home_page.side_effect = fetch
         self.window._prefetch()
-        self.assertEqual([item.label for item in self.window.getControl(230).items], ['c'])
-        self.assertEqual([item.label for item in self.window.getControl(231).items], ['d', 'View all'])
+        self.assertEqual([item.label for item in self.window.getControl(1000).items], ['a', 'b', 'View all'])
+        self.assertEqual([item.label for item in self.window.getControl(1003).items], ['c', 'later'])
+        self.assertEqual([item.label for item in self.window.getControl(1006).items], ['d', 'View all'])

@@ -8,6 +8,16 @@ from urllib.parse import quote, urlencode, urljoin, urlsplit
 from .client import Error
 
 
+def _catalog_page(result, types):
+    items = [item for item in result['items'] if item.get('type') in types]
+    page = {'items': items, 'next_cursor': result.get('page', {}).get('next_cursor')}
+    # Filtering unfamiliar types invalidates the server count for this client.
+    if (result.get('total_exact') is True and len(items) == len(result['items'])
+            and type(result.get('total')) is int and result['total'] >= len(items)):
+        page['total'] = result['total']
+    return page
+
+
 def _home_order(row):
     # Silo DefaultHomeSections recipe order; IDs remain server-owned.
     recipes = ('continue_watching', 'trending_discover', 'recently_added',
@@ -140,24 +150,20 @@ class Catalog:
 
     def home_page(self, section_id, cursor=None):
         query = {'source': 'section', 'scope': 'home', 'section_id': section_id, 'limit': 50,
-                 'skip_total': 'true'}
+                 'skip_total': 'true' if cursor else 'false'}
         if cursor is not None:
             query['cursor'] = cursor
         # Omit sort and type: preserve recipe ordering and episode cards.
         result = self._get('/catalog', query)
-        return {'items': [item for item in result['items']
-                          if item.get('type') in ('movie', 'series', 'episode')],
-                'next_cursor': result.get('page', {}).get('next_cursor')}
+        return _catalog_page(result, ('movie', 'series', 'episode'))
 
     def page(self, library_id, cursor=None):
         query = {'source': 'query', 'library_id': library_id, 'type': 'video',
-                 'sort': 'title', 'limit': 50, 'skip_total': 'true'}
+                 'sort': 'title', 'limit': 200, 'skip_total': 'true' if cursor else 'false'}
         if cursor is not None:
             query['cursor'] = cursor
         result = self._get('/catalog', query)
-        # Keep the server cursor even if an unfamiliar card was omitted.
-        return {'items': [item for item in result['items'] if item.get('type') in ('movie', 'series')],
-                'next_cursor': result.get('page', {}).get('next_cursor')}
+        return _catalog_page(result, ('movie', 'series'))
 
     def search(self, text, cursor=None):
         if self._search_type is None:
@@ -169,12 +175,11 @@ class Catalog:
                 capabilities = {}
             self._search_type = 'video_with_episodes' if capabilities.get('video_with_episodes_scope') else 'video'
         query = {'source': 'query', 'q': text, 'type': self._search_type,
-                 'limit': 50, 'skip_total': 'true'}
+                 'limit': 50, 'skip_total': 'true' if cursor else 'false'}
         if cursor is not None:
             query['cursor'] = cursor
         result = self._get('/catalog', query)
-        return {'items': [item for item in result['items'] if item.get('type') in ('movie', 'series', 'episode')],
-                'next_cursor': result.get('page', {}).get('next_cursor')}
+        return _catalog_page(result, ('movie', 'series', 'episode'))
 
     def set_state(self, content_id, field, enabled):
         path, method = {

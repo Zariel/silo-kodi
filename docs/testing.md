@@ -214,3 +214,14 @@ Temporary playback wrappers import the installed player without modifying its co
 Hold Enter/Select on a movie or episode to open its context menu. Kodi's keyboard mapping can be exercised with JSON-RPC `Input.ButtonEvent` using `button: "enter"`, `keymap: "KB"`, and `holdtime: 1000`. This checks Kodi's long-press translation and the installed add-on, but does not prove a physical remote sends the same key. Verify the physical remote separately; Menu or keyboard **C** also opens the actions.
 
 Cancel the menu and verify that playback and personal state remain unchanged. Toggle a favourite and verify it through the independent favourites endpoint, then restore its original value. On a disposable Home fixture, dismiss a progress card and verify it disappears both in the UI and in a fresh section response. Verify Next Up uses the series anchor and Continue Watching uses the observed progress timestamp. Removing an episode drops the whole show and can sync to a connected watch provider, so use isolated fixtures for show removal. Restore any test-owned dismissal and finish with idle display protection.
+
+## Vertical browsing regression
+
+Check Home, a library larger than two catalog pages, and a season with enough episodes to scroll. Use both individual presses and rapid Down/Up reversals. Observe the selected item and its screen position independently through Kodi's information labels; a successful input request alone does not prove navigation occurred.
+
+- On Home, move across several shelves, reverse direction, and return from details. Keep the horizontal card selection on each shelf. The next shelf should remain partially visible, and returning to the sidebar must resize the cards without overlap.
+- In a library, cross catalog-page boundaries while continuing to navigate. Every directional input should advance one row. Loading a page must not move the selected card, reset the viewport, or reload existing artwork.
+- Compare a season's episode list and horizontal navigation for regressions. Check the first and last rows and return from details.
+- Capture short framebuffer recordings before and after. Measure actual capture intervals: expensive full-frame capture can itself introduce lag. Use a narrow vertical strip for motion timing and full screenshots for layout. Do not equate the encoded video's frame rate with captured frames or display frame rate.
+
+Keep recordings, input traces, and measured results in ignored local testing storage. Finish with no test-owned playback or browser window left active.

@@ -60,6 +60,20 @@ class Browsing(unittest.TestCase):
                                                 'season_number': 1, 'episode_number': 1})
         self.assertEqual(result['content_id'], 'available')
 
+    def test_only_exact_supported_counts_reserve_native_grid_slots(self):
+        for total, exact, media, expected in (
+                (500, True, 'movie', 500), (500, False, 'movie', None),
+                (500, True, 'future', None), (0, True, 'movie', None),
+                ('500', True, 'movie', None), (True, True, 'movie', None)):
+            with self.subTest(total=total, exact=exact, media=media):
+                session = Session()
+                session.responses['/catalog?source=query&library_id=movies&type=video&sort=title&limit=200&skip_total=false'] = {
+                    'items': [{'content_id': 'first', 'type': media}], 'total': total,
+                    'total_exact': exact, 'page': {'next_cursor': 'next'}}
+                result = Catalog(session).page('movies')
+                self.assertEqual(result.get('total'), expected)
+                self.assertEqual(result['next_cursor'], 'next')
+
     def test_libraries_honor_effective_hidden_settings(self):
         session = Session()
         session.responses['/settings/values/effective?keys=ui.disabled_library_ids'] = {
@@ -189,10 +203,10 @@ class Browsing(unittest.TestCase):
 
     def test_cursor_survives_filtered_page(self):
         session = Session()
-        session.responses['/catalog?source=query&library_id=lib%2F1&type=video&sort=title&limit=50&skip_total=true'] = {
+        session.responses['/catalog?source=query&library_id=lib%2F1&type=video&sort=title&limit=200&skip_total=false'] = {
             'items': [{'content_id': 'unknown', 'type': 'future'}],
             'page': {'next_cursor': 'opaque/+?='}}
-        session.responses['/catalog?source=query&library_id=lib%2F1&type=video&sort=title&limit=50&skip_total=true&cursor=opaque%2F%2B%3F%3D'] = {
+        session.responses['/catalog?source=query&library_id=lib%2F1&type=video&sort=title&limit=200&skip_total=true&cursor=opaque%2F%2B%3F%3D'] = {
             'items': [{'content_id': 'title-1', 'type': 'movie', 'title': 'Example'}],
             'page': {'next_cursor': None}}
         catalog = Catalog(session)
@@ -260,7 +274,7 @@ class SearchAndActions(unittest.TestCase):
         for status in (404, 401):
             session = Session()
             session.responses['/catalog/search/capabilities'] = Error('http_error', status)
-            session.responses['/catalog?source=query&q=title&type=video&limit=50&skip_total=true'] = {
+            session.responses['/catalog?source=query&q=title&type=video&limit=50&skip_total=false'] = {
                 'items': [], 'page': {}}
             if status == 404:
                 self.assertEqual(Catalog(session).search('title'), {'items': [], 'next_cursor': None})
@@ -313,7 +327,7 @@ class SearchAndActions(unittest.TestCase):
         session.responses['/home/sections'] = {'sections': [
             {'id': 'recent', 'items': [{'content_id': 'r', 'type': 'movie'}]},
             {'id': 'watching', 'section_type': 'continue_watching', 'items': []}]}
-        session.responses['/catalog?source=section&scope=home&section_id=watching&limit=50&skip_total=true'] = {
+        session.responses['/catalog?source=section&scope=home&section_id=watching&limit=50&skip_total=false'] = {
             'items': [{'content_id': 'episode', 'type': 'episode'}], 'page': {'next_cursor': 'opaque'}}
         rows = Catalog(session).home_content([{'id': 'watching'}, {'id': 'recent'}])
         self.assertEqual([row['id'] for row in rows], ['watching', 'recent'])

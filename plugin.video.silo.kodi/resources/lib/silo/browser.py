@@ -1,6 +1,7 @@
 """Silo browsing windows using Kodi rendering and remote navigation."""
 from pathlib import Path
 import re
+import tempfile
 import threading
 from urllib.parse import urlencode
 
@@ -11,6 +12,7 @@ import xbmcvfs
 
 from .catalog import Catalog, artwork
 from .layout import _BrowserLayout
+from .home_layout import _write_home_layout
 from .details import detail_labels, watch_status
 from .settings import autoplay_delay
 from .artwork import _ArtworkPreloader
@@ -35,10 +37,12 @@ def _extend_page(target, data, cursor):
 
 
 class BrowserWindow(xbmcgui.WindowXML):
-    def __init__(self, *args, session, **kwargs):
+    def __init__(self, *args, session, home_sections, catalog=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.session = session
-        self.catalog = Catalog(session, cache_reads=True)
+        self.catalog = catalog if catalog is not None else Catalog(session, cache_reads=True)
+        self.home_sections = home_sections
+        self.home_controls = tuple(1000 + 3 * index for index in range(len(home_sections)))
         self.libraries = []
         self.history = []
         self.page = None
@@ -66,7 +70,7 @@ class BrowserWindow(xbmcgui.WindowXML):
             self.artwork = _ArtworkPreloader()
         self.catalog.artwork_scale = max(1, xbmcgui.getScreenWidth() / 1920)
         if self.layout is None:
-            self.layout = _BrowserLayout(self)
+            self.layout = _BrowserLayout(self, self.home_controls)
         self.layout.apply(True, force=True)
         self.bar_visible = None
         self._sync_bar()
@@ -154,15 +158,12 @@ class BrowserWindow(xbmcgui.WindowXML):
         self.getControl(11).setLabel(_text(self.session.status()['profile']['name']))
 
     def _home(self):
-        sections = self.catalog.home()
+        sections = self.home_sections
         if self.closed.is_set():
             return
         self.history = []
         self._show({'kind': 'home', 'title': 'Home', 'sections': sections,
-                    'offset': 0, 'positions': {}})
-
-    def _home_row(self, page, index):
-        return page['rows'][index]
+                    'positions': {}})
 
     def _home_rows(self, page, refresh):
         if refresh or 'rows' not in page:
@@ -172,33 +173,25 @@ class BrowserWindow(xbmcgui.WindowXML):
                 while (selected and selected != '__all__' and row.get('next_cursor')
                        and not any(item['content_id'] == selected for item in row['items'])):
                     if self.closed.is_set():
-                        return [], 0
+                        return []
                     cursor = row['next_cursor']
                     _extend_page(row, self.catalog.home_page(row['id'], cursor), cursor)
             page['rows'] = rows
             # Prioritise the first screen of every shelf before their tails.
             self._warm_artwork([item for row in rows for item in row['items'][:8]])
             self._warm_artwork([item for row in rows for item in row['items'][8:]])
-        visible = []
-        index = page['offset']
-        while index < len(page['sections']) and len(visible) < 3:
-            row = self._home_row(page, index)
-            if row['items']:
-                visible.append((index, row))
-            index += 1
-        return visible, index
+        return [row for row in page['rows'] if row['items']]
 
-    def _show_home(self, page, visible, index):
-        page['visible'] = visible[:2]
-        page['next_row'] = visible[2][0] if len(visible) > 2 else index
-        for slot in range(3):
-            control = self.getControl(230 + slot)
-            self.getControl(40 + slot).setLabel('')
-            if slot >= len(visible):
+    def _show_home(self, page, shelves):
+        page['shelves'] = shelves
+        for slot, identifier in enumerate(self.home_controls):
+            control = self.getControl(identifier)
+            self.getControl(identifier + 2).setVisible(slot < len(shelves))
+            if slot >= len(shelves):
                 control.reset()
                 continue
-            _, row = visible[slot]
-            self.getControl(40 + slot).setLabel(_text(row['title']))
+            row = shelves[slot]
+            self.getControl(identifier + 1).setLabel(_text(row['title']))
             cards = [self._card(data) for data in row['items']]
             if row.get('section_type') not in ('continue_watching', 'in_progress', 'next_up'):
                 cards.append(xbmcgui.ListItem('View all'))
@@ -210,45 +203,25 @@ class BrowserWindow(xbmcgui.WindowXML):
             if selected == '__all__':
                 position = len(row['items'])
             control.selectItem(position)
-        focus = page.get('focus', 230) if visible else 100
-        if visible and self.home_entry_focus is not None:
+            control.controlUp(self.getControl(self.home_controls[slot - 1] if slot else 100))
+            below = self.home_controls[slot + 1] if slot + 1 < len(shelves) else 500 if self.bar_visible else identifier
+            control.controlDown(self.getControl(below))
+        focus = page.get('focus', 1000) if shelves else 100
+        if focus in self.home_controls and page.get('home_focus'):
+            focus = next((self.home_controls[slot] for slot, row in enumerate(shelves)
+                          if row['id'] == page['home_focus']), focus)
+        if shelves and self.home_entry_focus is not None:
             focus = self.home_entry_focus
-            if focus == 230:
+            if focus == 1000:
                 self.home_entry_focus = None
-        if focus == 231 and len(visible) < 2:
-            focus = 230 if visible else 100
+        if focus in self.home_controls and self.home_controls.index(focus) >= len(shelves):
+            focus = 1000 if shelves else 100
         if self.keep_sidebar_focus:
             focus = 100
         self._restore_focus(page, focus)
-        self.getControl(100).controlRight(self.getControl(230 if visible else 100))
-        if not visible:
+        self.getControl(100).controlRight(self.getControl(1000 if shelves else 100))
+        if not shelves:
             self.getControl(21).setLabel('No titles on Home. Browse a library from the menu.')
-
-    def _move_home(self, direction):
-        page = self.page
-        slot = self.getFocusId() - 230
-        visible = page['visible']
-        self._remember()
-        if direction > 0:
-            if slot == 0 and len(visible) > 1:
-                self.setFocusId(231)
-            elif page['next_row'] < len(page['sections']):
-                page['offset'] = visible[-1][0]
-                page['focus'] = 231
-                self._show(page, refresh=False, motion=direction)
-            elif self.bar_visible:
-                self.setFocusId(500)
-        elif slot == 1:
-            self.setFocusId(230)
-        elif visible and visible[0][0] > 0:
-            index = visible[0][0] - 1
-            while index > 0 and not self._home_row(page, index)['items']:
-                index -= 1
-            page['offset'] = index
-            page['focus'] = 230
-            self._show(page, refresh=False, motion=direction)
-        else:
-            self.setFocusId(100)
 
     def _section(self, row):
         data = self.catalog.home_page(row['id'])
@@ -276,10 +249,10 @@ class BrowserWindow(xbmcgui.WindowXML):
         if not self.page:
             return None
         focus = self.getFocusId()
-        if focus in (230, 231) and self.page['kind'] == 'home':
-            rows = self.page.get('visible', [])
-            slot = focus - 230
-            items = rows[slot][1]['items'] if slot < len(rows) else []
+        if focus in self.home_controls and self.page['kind'] == 'home':
+            rows = self.page.get('shelves', [])
+            slot = self.home_controls.index(focus)
+            items = rows[slot]['items'] if slot < len(rows) else []
         elif focus in (200, 220):
             items = self.page.get('items', [])
         elif focus in (300, 302) and self.page['kind'] == 'item':
@@ -292,8 +265,8 @@ class BrowserWindow(xbmcgui.WindowXML):
     def _home_dismissal(self, selected):
         section_type = self.page.get('section_type')
         if self.page['kind'] == 'home':
-            slot = self.getFocusId() - 230
-            section_type = self.page['visible'][slot][1].get('section_type')
+            slot = self.home_controls.index(self.getFocusId())
+            section_type = self.page['shelves'][slot].get('section_type')
         if section_type not in ('continue_watching', 'in_progress', 'next_up'):
             return None
         for surface, field, label in (
@@ -372,8 +345,11 @@ class BrowserWindow(xbmcgui.WindowXML):
             if self.getFocusId() in range(500, 506):
                 self.page['bar_return_focus'] = self.browse_focus
             if self.page['kind'] == 'home':
-                for slot, (_, row) in enumerate(self.page.get('visible', [])):
-                    position = self.getControl(230 + slot).getSelectedPosition()
+                for slot, row in enumerate(self.page.get('shelves', [])):
+                    identifier = self.home_controls[slot]
+                    if self.getFocusId() == identifier:
+                        self.page['home_focus'] = row['id']
+                    position = self.getControl(identifier).getSelectedPosition()
                     self.page['positions'][row['id']] = (row['items'][position]['content_id']
                                                          if 0 <= position < len(row['items']) else '__all__')
                 return
@@ -398,8 +374,12 @@ class BrowserWindow(xbmcgui.WindowXML):
             self.artwork.add(artwork(self.session.server, item.get(key))
                              for item in items for key in ('poster_url', 'still_url'))
 
-    def _card(self, data, label=None, art_key='poster_url'):
-        item = xbmcgui.ListItem(_text(label or data.get('title') or 'Untitled'))
+    def _card(self, data, label=None, art_key='poster_url', item=None):
+        text = _text(label or data.get('title') or 'Untitled')
+        if item is None:
+            item = xbmcgui.ListItem(text)
+        else:
+            item.setLabel(text)
         item.setArt({'poster': artwork(self.session.server, data.get(art_key))})
         item.setProperty('summary', _text(data.get('overview') or ''))
         meta = []
@@ -445,7 +425,7 @@ class BrowserWindow(xbmcgui.WindowXML):
         self.getControl(30).setImage('')
         for identifier in (24, 25, 26, 27):
             self.getControl(identifier).setLabel('')
-        for identifier in ((200, 210, 220) if kind == 'home' else (200, 210, 220, 230, 231, 232)):
+        for identifier in (200, 210, 220):
             self.getControl(identifier).reset()
         self.getControl(300).setVisible(False)
         self.getControl(302).setVisible(kind == 'item')
@@ -455,7 +435,7 @@ class BrowserWindow(xbmcgui.WindowXML):
         self.getControl(303).setVisible(bool(parent))
         self.getControl(303).setLabel('Show' if kind == 'season' else 'Season')
         if kind == 'home':
-            self._show_home(page, *rows)
+            self._show_home(page, rows)
             if self.layout is not None and motion:
                 self.layout.reveal(motion)
             return
@@ -463,7 +443,10 @@ class BrowserWindow(xbmcgui.WindowXML):
         if kind in ('library', 'section', 'search'):
             control_id = 200
             control = self.getControl(control_id)
-            control.addItems([self._card(data) for data in page['items']])
+            cards = [self._card(data) for data in page['items']]
+            if page.get('next_cursor') and page.get('total', 0) > len(cards):
+                cards.extend(xbmcgui.ListItem('') for _ in range(page['total'] - len(cards)))
+            control.addItems(cards)
             if not page['items'] and not page.get('next_cursor'):
                 self.getControl(21).setLabel('No matching titles.' if page['kind'] == 'search' else 'This library has no visible titles.')
         else:
@@ -597,8 +580,12 @@ class BrowserWindow(xbmcgui.WindowXML):
         if state:
             self.setProperty('playback_title', _text(state.get('title') or 'Silo video'))
             self.getControl(500).setLabel('Play' if xbmc.getCondVisibility('Player.Paused') else 'Pause')
-        if self.layout is not None and visible != self.bar_visible:
-            self.layout.playback(visible)
+        if visible != self.bar_visible:
+            if self.layout is not None:
+                self.layout.playback(visible)
+            if self.page and self.page['kind'] == 'home' and self.page.get('shelves'):
+                last = self.home_controls[len(self.page['shelves']) - 1]
+                self.getControl(last).controlDown(self.getControl(500 if visible else last))
         self.bar_visible = visible
         if not visible and self.page and self.page.get('focus') in range(500, 506):
             self.page['focus'] = self.browse_focus
@@ -631,9 +618,9 @@ class BrowserWindow(xbmcgui.WindowXML):
         if self.closed.is_set() or self.busy or self.page is not page:
             return False
         if page['kind'] == 'home':
-            slot = control_id - 230
-            rows = page.get('visible', [])
-            if slot >= len(rows) or rows[slot][1] is not target:
+            slot = self.home_controls.index(control_id)
+            rows = page.get('shelves', [])
+            if slot >= len(rows) or rows[slot] is not target:
                 return False
         profile = self.session.status()['profile']
         return profile is not None and profile['id'] == self.catalog.profile_id
@@ -646,12 +633,12 @@ class BrowserWindow(xbmcgui.WindowXML):
         control_id = 200
         control = self.getControl(control_id)
         if page['kind'] == 'home':
-            for slot, (_, row) in enumerate(page.get('visible', [])):
-                candidate = self.getControl(230 + slot)
+            for slot, row in enumerate(page.get('shelves', [])):
+                candidate = self.getControl(self.home_controls[slot])
                 if (row.get('next_cursor') and not row.get('paging_failed')
                         and len(row['items']) - max(0, candidate.getSelectedPosition()) <= 58):
                     target, control = row, candidate
-                    control_id = 230 + slot
+                    control_id = self.home_controls[slot]
                     break
             else:
                 return
@@ -687,9 +674,22 @@ class BrowserWindow(xbmcgui.WindowXML):
                 return
             added = _extend_page(target, data, cursor)
             self._warm_artwork(added)
-            if added:
+            if page['kind'] != 'home' and 'total' in target:
+                count = len(target['items'])
+                if count > control.size() or (not target['next_cursor'] and count != control.size()):
+                    # Deletions or omitted future media types can invalidate an
+                    # earlier exact count. Reconcile membership at the boundary.
+                    selection = max(0, control.getSelectedPosition())
+                    target.pop('total')
+                    control.reset()
+                    control.addItems([self._card(item) for item in target['items']])
+                    if count:
+                        control.selectItem(min(selection, count - 1))
+                else:
+                    for index, data in enumerate(added, count - len(added)):
+                        self._card(data, item=control.getListItem(index))
+            elif added:
                 selection = max(0, control.getSelectedPosition())
-                # Kodi rebinds the entire list on addItems; restore focus in the same message batch.
                 control.addItems([self._card(item) for item in added])
                 control.selectItem(selection)
             if page['kind'] != 'home' and not target['items'] and not target['next_cursor']:
@@ -782,11 +782,11 @@ class BrowserWindow(xbmcgui.WindowXML):
                 self._task(lambda: xbmcaddon.Addon('plugin.video.silo.kodi').openSettings())
             else:
                 self.close()
-        elif control in (230, 231):
-            slot = control - 230
-            if slot >= len(self.page['visible']):
+        elif control in self.home_controls:
+            slot = self.home_controls.index(control)
+            if slot >= len(self.page['shelves']):
                 return
-            row = self.page['visible'][slot][1]
+            row = self.page['shelves'][slot]
             index = self.getControl(control).getSelectedPosition()
             if index == len(row['items']):
                 self._task(lambda: self._section(row))
@@ -831,22 +831,17 @@ class BrowserWindow(xbmcgui.WindowXML):
                 self.home_entry_focus = None
                 self.keep_sidebar_focus = True
             else:
-                self.home_entry_focus = 230
+                self.home_entry_focus = 1000
                 self.keep_sidebar_focus = False
-                if not self.busy and self.page and self.page['kind'] == 'home' and self.page.get('visible'):
+                if not self.busy and self.page and self.page['kind'] == 'home' and self.page.get('shelves'):
                     self.getControl(100).selectItem(0)
-                    self.setFocusId(230)
+                    self.setFocusId(1000)
                     self.home_entry_focus = None
             return
         if self.busy and action.getId() in (1, 2, 3, 4) and self.getFocusId() == 100:
             self.keep_sidebar_focus = True
         if action.getId() == 117:
             self._task(self._context)
-            return
-        if (not self.busy and self.page and self.page['kind'] == 'home'
-                and self.getFocusId() in (230, 231) and action.getId() in (3, 4)):
-            direction = 1 if action.getId() == 4 else -1
-            self._task(lambda: self._move_home(direction))
             return
         if action.getId() in (9, 10, 92):
             self._back()
@@ -877,11 +872,18 @@ def open_browser():
         session = Session.open(directory)
         if not session or not session.status()['signed_in'] or not session.status()['profile']:
             return
-        window = BrowserWindow('Browser.xml', addon.getAddonInfo('path'), 'Default', '1080i', session=session)
-        try:
-            window.doModal()
-        finally:
-            window.finish()
+        catalog = Catalog(session, cache_reads=True)
+        sections = catalog.home()
+        # Native grouplist children are fixed at window creation. Generate only
+        # control structure here; catalog data stays in the session's memory cache.
+        with tempfile.TemporaryDirectory(prefix='browser-', dir=directory) as skin:
+            _write_home_layout(addon.getAddonInfo('path'), skin, len(sections))
+            window = BrowserWindow('Browser.xml', skin, 'Default', '1080i', session=session,
+                                   catalog=catalog, home_sections=sections)
+            try:
+                window.doModal()
+            finally:
+                window.finish()
         if not window.account_requested:
             return
         open_account()
